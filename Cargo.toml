@@ -1,0 +1,47 @@
+[package]
+name = "ili9325"
+version = "0.1.0"
+edition = "2021"
+authors = ["Dillon Min <dillon.minfei@gmail.com>"]
+description = "A platform agnostic driver to interface with the ILI9325 TFT LCD display"
+keywords = ["embedded-hal-driver", "display", "LCD"]
+categories = ["embedded", "hardware-support", "no-std"]
+license = "MIT OR Apache-2.0"
+[dependencies.display-interface]
+version = "0.4.1"
+
+[dependencies.embedded-graphics-core]
+version = "0.3"
+optional = true
+
+[dependencies.embedded-hal]
+version = "0.2.5"
+
+[features]
+default = ["graphics"]
+graphics = ["embedded-graphics-core"]
+display = ["display-interface-parallel-gpio"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[dependencies.display-interface-parallel-gpio]
+version = "0.6.0"
+optional = true
+
+[dev-dependencies]
+embedded-graphics = "0.7.1"
+cortex-m-rtic = { version = "1.1.4" }
+panic-semihosting = "0.6.0"
+cortex-m-rt = "0.7.3"
+defmt = "0.3.4"
+defmt-rtt = "0.4.0"
+stm32f4xx-hal = { version = "0.16.2", features = ["rt", "stm32f446"]}
+
+[dev-dependencies.ili9325]
+version = "0.1.0"
+path = "."
+
+[dependencies]
+
+[[example]]
+name = "ili9325-on-gpio"
+required-features = ["display"]
