@@ -111,7 +111,7 @@ where
         // Wait 5ms after reset before sending commands
         // and 120ms before sending Sleep Out
         delay.delay_ms(5);
-
+/*
         // Do software reset
         ili9325.command(Command::SoftwareReset, &[])?;
 
@@ -130,7 +130,46 @@ where
         delay.delay_ms(5);
 
         ili9325.command(Command::DisplayOn, &[])?;
-
+*/
+        ili9325.command(Command::DriverOutputCtl, &[0x01, 0x00])?;
+    	ili9325.command(Command::LcdDrvCtl, &[0x07, 0x00])?;
+	    ili9325.command(Command::EntryMode, &[0x10, 0x30])?;
+    	ili9325.command(Command::ResizeCtl, &[0x00, 0x00])?;
+	    ili9325.command(Command::DispCtl2, &[0x02, 0x07])?;
+    	ili9325.command(Command::DispCtl3, &[0x00, 0x00])?;
+	    ili9325.command(Command::DispCtl4, &[0x00, 0x00])?;
+    	ili9325.command(Command::RGBDispCtl1, &[0x00, 0x00])?;
+	    ili9325.command(Command::FrameMarker, &[0x00, 0x00])?;
+    	ili9325.command(Command::RGBDispCtl2, &[0x00, 0x00])?;
+        delay.delay_ms(50);
+    	ili9325.command(Command::DispCtl1, &[0x01, 0x01])?;
+        delay.delay_ms(50);
+	    ili9325.command(Command::PwrCtl1, &[0x16, 0xb0])?;
+    	ili9325.command(Command::PwrCtl2, &[0x00, 0x01])?;
+	    ili9325.command(Command::Reg17, &[0x00, 0x01])?;
+    	ili9325.command(Command::PwrCtl3, &[0x01, 0x38])?;
+	    ili9325.command(Command::PwrCtl4, &[0x08, 0x00])?;
+    	ili9325.command(Command::PwrCtl7, &[0x00, 0x09])?;
+	    ili9325.command(Command::PwrCtl8, &[0x00, 0x09])?;
+    	ili9325.command(Command::Rega4, &[0x00, 0x00])?;
+	    ili9325.command(Command::HorizontalAddrStart, &[0x00, 0x00])?;
+    	ili9325.command(Command::HorizontalAddrEnd, &[0x00, 0xef])?;
+	    ili9325.command(Command::VerticalAddrStart, &[0x00, 0x00])?;
+    	ili9325.command(Command::VerticalAddrEnd, &[0x01, 0x3f])?;
+	    ili9325.command(Command::DrvCtl2, &[0xa7, 0x00])?;
+    	ili9325.command(Command::Bidc, &[0x00, 0x03])?;
+	    ili9325.command(Command::Vsc, &[0x00, 0x00])?;
+    	ili9325.command(Command::Reg80, &[0x00, 0x00])?;
+	    ili9325.command(Command::Reg81, &[0x00, 0x00])?;
+    	ili9325.command(Command::Reg82, &[0x00, 0x00])?;
+	    ili9325.command(Command::Reg83, &[0x00, 0x00])?;
+        ili9325.command(Command::Reg84, &[0x00, 0x00])?;
+    	ili9325.command(Command::Reg85, &[0x00, 0x00])?;
+	    ili9325.command(Command::Reg90, &[0x00, 0x13])?;
+        ili9325.command(Command::Reg92, &[0x00, 0x00])?;
+    	ili9325.command(Command::Reg93, &[0x00, 0x03])?;
+	    ili9325.command(Command::Reg95, &[0x01, 0x10])?;
+    	ili9325.command(Command::DispCtl1, &[0x01, 0x73])?;
         Ok(ili9325)
     }
 }
@@ -148,31 +187,26 @@ where
     }
 
     fn write_iter<I: IntoIterator<Item = u16>>(&mut self, data: I) -> Result {
-        self.command(Command::MemoryWrite, &[])?;
+        self.command(Command::WriteDataToGram, &[])?;
+        //self.interface.send_commands(U8Iter(&mut once(Command::WriteDataToGram as u8)))?;
         self.cs.set_low().map_err(|_| DisplayError::RSError)?;
         self.interface.send_data(U16BEIter(&mut data.into_iter()))?;
         self.cs.set_high().map_err(|_| DisplayError::RSError)
     }
 
     fn set_window(&mut self, x0: u16, y0: u16, x1: u16, y1: u16) -> Result {
-        self.command(
-            Command::ColumnAddressSet,
-            &[
-                (x0 >> 8) as u8,
-                (x0 & 0xff) as u8,
-                (x1 >> 8) as u8,
-                (x1 & 0xff) as u8,
-            ],
-        )?;
-        self.command(
-            Command::PageAddressSet,
-            &[
-                (y0 >> 8) as u8,
-                (y0 & 0xff) as u8,
-                (y1 >> 8) as u8,
-                (y1 & 0xff) as u8,
-            ],
-        )
+        self.command(Command::HorizontalAddrStart,
+                     &[ (x0 >> 8) as u8, (x0 & 0xff) as u8])?;
+        self.command(Command::HorizontalAddrEnd,
+                     &[ (x1 >> 8) as u8, (x1 & 0xff) as u8])?;
+        self.command(Command::VerticalAddrStart,
+                     &[ (y0 >> 8) as u8, (y0 & 0xff) as u8])?;
+        self.command(Command::VerticalAddrEnd,
+                     &[ (y1 >> 8) as u8, (y1 & 0xff) as u8])?;
+        self.command(Command::HorizontalGRAMAddrSet,
+                     &[ (x0 >> 8) as u8, (x0 & 0xff) as u8])?;
+        self.command(Command::VerticalGRAMAddrSet,
+                     &[ (y0 >> 8) as u8, (y0 & 0xff) as u8])
     }
 
     /// Configures the screen for hardware-accelerated vertical scrolling.
@@ -318,14 +352,56 @@ impl Scroller {
 
 #[derive(Clone, Copy)]
 enum Command {
-    SoftwareReset = 0x01,
-    MemoryAccessControl = 0x36,
-    PixelFormatSet = 0x3a,
-    SleepOut = 0x11,
-    DisplayOn = 0x29,
-    ColumnAddressSet = 0x2a,
-    PageAddressSet = 0x2b,
-    MemoryWrite = 0x2c,
+//    SoftwareReset = 0x01,
+//    PixelFormatSet = 0x3a,
+//    SleepOut = 0x11,
+//    DisplayOn = 0x29,
+//    ColumnAddressSet = 0x2a,
+//    PageAddressSet = 0x2b,
+//    MemoryWrite = 0x2c,
+    
     VerticalScrollDefine = 0x33,
     VerticalScrollAddr = 0x37,
+
+    
+    MemoryAccessControl = 0x36,
+    DriverOutputCtl = 0x01,
+    LcdDrvCtl = 0x02,
+    EntryMode = 0x03,
+    ResizeCtl = 0x04,
+    DispCtl1 = 0x07,
+    DispCtl2 = 0x08,
+    DispCtl3 = 0x09,
+    DispCtl4 = 0x0a,
+    RGBDispCtl1 = 0x0c,
+    FrameMarker = 0x0d,
+    RGBDispCtl2 = 0x0f,
+    PwrCtl1 = 0x10,
+    PwrCtl2 = 0x11,
+    PwrCtl3 = 0x12,
+    PwrCtl4 = 0x13,
+    Reg17   = 0x17,
+    PwrCtl7 = 0x29,
+    PwrCtl8 = 0x2a,
+    DrvCtl2 = 0x60,
+    Bidc    = 0x61,
+    Vsc     = 0x6a,
+    Reg80   = 0x80,
+    Reg81   = 0x81,
+    Reg82   = 0x82,
+    Reg83   = 0x83,
+    Reg84   = 0x84,
+    Reg85   = 0x85,
+    Reg90   = 0x90,
+    Reg92   = 0x92,
+    Reg93   = 0x93,
+    Reg95   = 0x95,
+    Rega4   = 0xa4,
+    HorizontalGRAMAddrSet = 0x20,
+    VerticalGRAMAddrSet = 0x21,
+    WriteDataToGram = 0x22,
+    HorizontalAddrStart = 0x50,
+    HorizontalAddrEnd = 0x51,
+    VerticalAddrStart = 0x52,
+    VerticalAddrEnd = 0x53,
 }
