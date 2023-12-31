@@ -191,33 +191,7 @@ dependencies = [
 
 [[package]]
 name = "display-interface"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7517c040926d7b02b111884aa089177db80878533127f7c1b480d852c5fb4112"
-
-[[package]]
-name = "display-interface"
 version = "0.5.0-alpha.1"
-
-[[package]]
-name = "display-interface-parallel-gpio"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5302b2830aee1d2275dec183a2d7f9b70a27831e5fe772049e0a7f460d37b200"
-dependencies = [
- "display-interface 0.4.1",
- "embedded-hal 0.2.7",
-]
-
-[[package]]
-name = "display-interface-parallel-stm32-gpio"
-version = "0.7.0-alpha.1"
-dependencies = [
- "cortex-m-semihosting",
- "display-interface 0.5.0-alpha.1",
- "embedded-hal 0.2.7",
- "stm32f4xx-hal",
-]
 
 [[package]]
 name = "embedded-dma"
@@ -347,9 +321,7 @@ dependencies = [
  "cortex-m-semihosting",
  "defmt",
  "defmt-rtt",
- "display-interface 0.5.0-alpha.1",
- "display-interface-parallel-gpio",
- "display-interface-parallel-stm32-gpio",
+ "display-interface",
  "embedded-graphics",
  "embedded-graphics-core",
  "embedded-hal 0.2.7",

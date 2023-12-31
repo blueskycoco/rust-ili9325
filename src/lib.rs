@@ -1,7 +1,6 @@
 #![no_std]
 
 use embedded_hal::blocking::delay::DelayMs;
-use embedded_hal::digital::v2::OutputPin;
 
 use core::iter::once;
 use display_interface::DataFormat::{U16BEIter, U8Iter, U16};
@@ -40,14 +39,6 @@ impl DisplaySize for DisplaySize320x480 {
     const HEIGHT: usize = 480;
 }
 
-/// The default orientation is Portrait
-pub enum Orientation {
-    Portrait,
-    PortraitFlipped,
-    Landscape,
-    LandscapeFlipped,
-}
-
 /// There are two method for drawing to the screen:
 /// [Ili9325::draw_raw_iter] and [Ili9325::draw_raw_slice]
 ///
@@ -67,7 +58,6 @@ pub struct Ili9325<IFACE> {
     interface: IFACE,
     width: usize,
     height: usize,
-    mode: Orientation,
 }
 
 impl<IFACE> Ili9325<IFACE>
@@ -77,7 +67,6 @@ where
     pub fn new<DELAY, SIZE>(
         interface: IFACE,
         delay: &mut DELAY,
-        mode: Orientation,
         _display_size: SIZE,
     ) -> Result<Self>
     where
@@ -88,17 +77,8 @@ where
             interface,
             width: SIZE::WIDTH,
             height: SIZE::HEIGHT,
-            mode: Orientation::Portrait,
         };
 
-//        ili9325.cs.set_high().map_err(|_| DisplayError::RSError)?;
-        // Do hardware reset by holding reset low for at least 10us
-//        ili9325.reset.set_low().map_err(|_| DisplayError::RSError)?;
-//        delay.delay_ms(100);
-        // Set high for normal operation
-//        ili9325.reset.set_high().map_err(|_| DisplayError::RSError)?;
-//        delay.delay_ms(100);
-        
         ili9325.command(Command::DriverOutputCtl,       &[0x0100])?;
         ili9325.command(Command::LcdDrvCtl,             &[0x0700])?;
         ili9325.command(Command::EntryMode,             &[0x1030])?;
@@ -160,17 +140,11 @@ where
 
     fn set_window(&mut self, x0: u16, y0: u16, x1: u16, y1: u16) -> Result {
         self.command(Command::HorizontalAddrStart, &[x0])?;
-//                   &[ (x0 >> 8) as u8, (x0 & 0xff) as u8])?;
         self.command(Command::HorizontalAddrEnd, &[x1])?; 
-//                   &[ (x1 >> 8) as u8, (x1 & 0xff) as u8])?;
         self.command(Command::VerticalAddrStart, &[y0])?;
-//                   &[ (y0 >> 8) as u8, (y0 & 0xff) as u8])?;
         self.command(Command::VerticalAddrEnd, &[y1])?;
-//                   &[ (y1 >> 8) as u8, (y1 & 0xff) as u8])?;
         self.command(Command::HorizontalGRAMAddrSet, &[x0])?; 
-//                   &[ (x0 >> 8) as u8, (x0 & 0xff) as u8])?;
         self.command(Command::VerticalGRAMAddrSet, &[y0])
-//                   &[ (y0 >> 8) as u8, (y0 & 0xff) as u8])
     }
 
     /// Draw a rectangle on the screen, represented by top-left corner (x0, y0)
@@ -223,19 +197,6 @@ impl<IFACE> Ili9325<IFACE> {
 
 #[derive(Clone, Copy)]
 enum Command {
-//    SoftwareReset = 0x01,
-//    PixelFormatSet = 0x3a,
-//    SleepOut = 0x11,
-//    DisplayOn = 0x29,
-//    ColumnAddressSet = 0x2a,
-//    PageAddressSet = 0x2b,
-//    MemoryWrite = 0x2c,
-    
-    VerticalScrollDefine = 0x33,
-    VerticalScrollAddr = 0x37,
-
-    
-    MemoryAccessControl = 0x36,
     DriverOutputCtl = 0x01,
     LcdDrvCtl = 0x02,
     EntryMode = 0x03,

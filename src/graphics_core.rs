@@ -5,7 +5,6 @@ use embedded_graphics_core::{
     prelude::*,
     primitives::Rectangle,
 };
-use embedded_hal::digital::v2::OutputPin;
 
 impl<IFACE> OriginDimensions for Ili9325<IFACE> {
     fn size(&self) -> Size {
