@@ -4,7 +4,7 @@ use embedded_hal::blocking::delay::DelayMs;
 use embedded_hal::digital::v2::OutputPin;
 
 use core::iter::once;
-use display_interface::DataFormat::{U16BEIter, U8Iter};
+use display_interface::DataFormat::{U16BEIter, U8Iter, U16};
 use display_interface::WriteOnlyDataCommand;
 
 #[cfg(feature = "graphics")]
@@ -63,25 +63,19 @@ pub enum Orientation {
 /// - As soon as a pixel is received, an internal counter is incremented,
 ///   and the next word will fill the next pixel (the adjacent on the right, or
 ///   the first of the next row if the row ended)
-pub struct Ili9325<IFACE, RESET, CS> {
+pub struct Ili9325<IFACE> {
     interface: IFACE,
-    reset: RESET,
-    cs: CS,
     width: usize,
     height: usize,
     mode: Orientation,
 }
 
-impl<IFACE, RESET, CS> Ili9325<IFACE, RESET, CS>
+impl<IFACE> Ili9325<IFACE>
 where
     IFACE: WriteOnlyDataCommand,
-    RESET: OutputPin,
-    CS: OutputPin,
 {
     pub fn new<DELAY, SIZE>(
         interface: IFACE,
-        reset: RESET,
-        cs: CS,
         delay: &mut DELAY,
         mode: Orientation,
         _display_size: SIZE,
@@ -92,164 +86,91 @@ where
     {
         let mut ili9325 = Ili9325 {
             interface,
-            reset,
-            cs,
             width: SIZE::WIDTH,
             height: SIZE::HEIGHT,
             mode: Orientation::Portrait,
         };
 
+//        ili9325.cs.set_high().map_err(|_| DisplayError::RSError)?;
         // Do hardware reset by holding reset low for at least 10us
-        ili9325.reset.set_low().map_err(|_| DisplayError::RSError)?;
-        delay.delay_ms(1);
+//        ili9325.reset.set_low().map_err(|_| DisplayError::RSError)?;
+//        delay.delay_ms(100);
         // Set high for normal operation
-        ili9325
-            .reset
-            .set_high()
-            .map_err(|_| DisplayError::RSError)?;
-
-        // Wait 5ms after reset before sending commands
-        // and 120ms before sending Sleep Out
-        delay.delay_ms(5);
-/*
-        // Do software reset
-        ili9325.command(Command::SoftwareReset, &[])?;
-
-        // Wait 5ms after reset before sending commands
-        // and 120ms before sending Sleep Out
-        delay.delay_ms(120);
-
-        ili9325.set_orientation(mode)?;
-
-        // Set pixel format to 16 bits per pixel
-        ili9325.command(Command::PixelFormatSet, &[0x55])?;
-
-        ili9325.command(Command::SleepOut, &[])?;
-
-        // Wait 5ms after Sleep Out before sending commands
-        delay.delay_ms(5);
-
-        ili9325.command(Command::DisplayOn, &[])?;
-*/
-        ili9325.command(Command::DriverOutputCtl, &[0x01, 0x00])?;
-    	ili9325.command(Command::LcdDrvCtl, &[0x07, 0x00])?;
-	    ili9325.command(Command::EntryMode, &[0x10, 0x30])?;
-    	ili9325.command(Command::ResizeCtl, &[0x00, 0x00])?;
-	    ili9325.command(Command::DispCtl2, &[0x02, 0x07])?;
-    	ili9325.command(Command::DispCtl3, &[0x00, 0x00])?;
-	    ili9325.command(Command::DispCtl4, &[0x00, 0x00])?;
-    	ili9325.command(Command::RGBDispCtl1, &[0x00, 0x00])?;
-	    ili9325.command(Command::FrameMarker, &[0x00, 0x00])?;
-    	ili9325.command(Command::RGBDispCtl2, &[0x00, 0x00])?;
+//        ili9325.reset.set_high().map_err(|_| DisplayError::RSError)?;
+//        delay.delay_ms(100);
+        
+        ili9325.command(Command::DriverOutputCtl,       &[0x0100])?;
+        ili9325.command(Command::LcdDrvCtl,             &[0x0700])?;
+        ili9325.command(Command::EntryMode,             &[0x1030])?;
+        ili9325.command(Command::ResizeCtl,             &[0x0000])?;
+        ili9325.command(Command::DispCtl2,              &[0x0207])?;
+        ili9325.command(Command::DispCtl3,              &[0x0000])?;
+        ili9325.command(Command::DispCtl4,              &[0x0000])?;
+        ili9325.command(Command::RGBDispCtl1,           &[0x0000])?;
+        ili9325.command(Command::FrameMarker,           &[0x0000])?;
+        ili9325.command(Command::RGBDispCtl2,           &[0x0000])?;
         delay.delay_ms(50);
-    	ili9325.command(Command::DispCtl1, &[0x01, 0x01])?;
+        ili9325.command(Command::DispCtl1,              &[0x0101])?;
         delay.delay_ms(50);
-	    ili9325.command(Command::PwrCtl1, &[0x16, 0xb0])?;
-    	ili9325.command(Command::PwrCtl2, &[0x00, 0x01])?;
-	    ili9325.command(Command::Reg17, &[0x00, 0x01])?;
-    	ili9325.command(Command::PwrCtl3, &[0x01, 0x38])?;
-	    ili9325.command(Command::PwrCtl4, &[0x08, 0x00])?;
-    	ili9325.command(Command::PwrCtl7, &[0x00, 0x09])?;
-	    ili9325.command(Command::PwrCtl8, &[0x00, 0x09])?;
-    	ili9325.command(Command::Rega4, &[0x00, 0x00])?;
-	    ili9325.command(Command::HorizontalAddrStart, &[0x00, 0x00])?;
-    	ili9325.command(Command::HorizontalAddrEnd, &[0x00, 0xef])?;
-	    ili9325.command(Command::VerticalAddrStart, &[0x00, 0x00])?;
-    	ili9325.command(Command::VerticalAddrEnd, &[0x01, 0x3f])?;
-	    ili9325.command(Command::DrvCtl2, &[0xa7, 0x00])?;
-    	ili9325.command(Command::Bidc, &[0x00, 0x03])?;
-	    ili9325.command(Command::Vsc, &[0x00, 0x00])?;
-    	ili9325.command(Command::Reg80, &[0x00, 0x00])?;
-	    ili9325.command(Command::Reg81, &[0x00, 0x00])?;
-    	ili9325.command(Command::Reg82, &[0x00, 0x00])?;
-	    ili9325.command(Command::Reg83, &[0x00, 0x00])?;
-        ili9325.command(Command::Reg84, &[0x00, 0x00])?;
-    	ili9325.command(Command::Reg85, &[0x00, 0x00])?;
-	    ili9325.command(Command::Reg90, &[0x00, 0x13])?;
-        ili9325.command(Command::Reg92, &[0x00, 0x00])?;
-    	ili9325.command(Command::Reg93, &[0x00, 0x03])?;
-	    ili9325.command(Command::Reg95, &[0x01, 0x10])?;
-    	ili9325.command(Command::DispCtl1, &[0x01, 0x73])?;
+        ili9325.command(Command::PwrCtl1,               &[0x16b0])?;
+        ili9325.command(Command::PwrCtl2,               &[0x0001])?;
+        ili9325.command(Command::Reg17,                 &[0x0001])?;
+        ili9325.command(Command::PwrCtl3,               &[0x0138])?;
+        ili9325.command(Command::PwrCtl4,               &[0x0800])?;
+        ili9325.command(Command::PwrCtl7,               &[0x0009])?;
+        ili9325.command(Command::PwrCtl8,               &[0x0009])?;
+        ili9325.command(Command::Rega4,                 &[0x0000])?;
+        ili9325.command(Command::HorizontalAddrStart,   &[0x0000])?;
+        ili9325.command(Command::HorizontalAddrEnd,     &[0x00ef])?;
+        ili9325.command(Command::VerticalAddrStart,     &[0x0000])?;
+        ili9325.command(Command::VerticalAddrEnd,       &[0x013f])?;
+        ili9325.command(Command::DrvCtl2,               &[0xa700])?;
+        ili9325.command(Command::Bidc,                  &[0x0003])?;
+        ili9325.command(Command::Vsc,                   &[0x0000])?;
+        ili9325.command(Command::Reg80,                 &[0x0000])?;
+        ili9325.command(Command::Reg81,                 &[0x0000])?;
+        ili9325.command(Command::Reg82,                 &[0x0000])?;
+        ili9325.command(Command::Reg83,                 &[0x0000])?;
+        ili9325.command(Command::Reg84,                 &[0x0000])?;
+        ili9325.command(Command::Reg85,                 &[0x0000])?;
+        ili9325.command(Command::Reg90,                 &[0x0013])?;
+        ili9325.command(Command::Reg92,                 &[0x0000])?;
+        ili9325.command(Command::Reg93,                 &[0x0003])?;
+        ili9325.command(Command::Reg95,                 &[0x0110])?;
+        ili9325.command(Command::DispCtl1,              &[0x0173])?;
+        delay.delay_ms(50);
         Ok(ili9325)
     }
 }
 
-impl<IFACE, RESET, CS> Ili9325<IFACE, RESET, CS>
+impl<IFACE> Ili9325<IFACE>
 where
     IFACE: WriteOnlyDataCommand,
-    CS: OutputPin,
 {
-    fn command(&mut self, cmd: Command, args: &[u8]) -> Result {
-        self.cs.set_low().map_err(|_| DisplayError::RSError)?;
+    fn command(&mut self, cmd: Command, args: &[u16]) -> Result {
         self.interface.send_commands(U8Iter(&mut once(cmd as u8)))?;
-        self.interface.send_data(U8Iter(&mut args.iter().cloned()))?;
-        self.cs.set_high().map_err(|_| DisplayError::RSError)
+        self.interface.send_data(U16(args))
     }
 
     fn write_iter<I: IntoIterator<Item = u16>>(&mut self, data: I) -> Result {
         self.command(Command::WriteDataToGram, &[])?;
         //self.interface.send_commands(U8Iter(&mut once(Command::WriteDataToGram as u8)))?;
-        self.cs.set_low().map_err(|_| DisplayError::RSError)?;
-        self.interface.send_data(U16BEIter(&mut data.into_iter()))?;
-        self.cs.set_high().map_err(|_| DisplayError::RSError)
+        self.interface.send_data(U16BEIter(&mut data.into_iter()))
     }
 
     fn set_window(&mut self, x0: u16, y0: u16, x1: u16, y1: u16) -> Result {
-        self.command(Command::HorizontalAddrStart,
-                     &[ (x0 >> 8) as u8, (x0 & 0xff) as u8])?;
-        self.command(Command::HorizontalAddrEnd,
-                     &[ (x1 >> 8) as u8, (x1 & 0xff) as u8])?;
-        self.command(Command::VerticalAddrStart,
-                     &[ (y0 >> 8) as u8, (y0 & 0xff) as u8])?;
-        self.command(Command::VerticalAddrEnd,
-                     &[ (y1 >> 8) as u8, (y1 & 0xff) as u8])?;
-        self.command(Command::HorizontalGRAMAddrSet,
-                     &[ (x0 >> 8) as u8, (x0 & 0xff) as u8])?;
-        self.command(Command::VerticalGRAMAddrSet,
-                     &[ (y0 >> 8) as u8, (y0 & 0xff) as u8])
-    }
-
-    /// Configures the screen for hardware-accelerated vertical scrolling.
-    pub fn configure_vertical_scroll(
-        &mut self,
-        fixed_top_lines: u16,
-        fixed_bottom_lines: u16,
-    ) -> Result<Scroller> {
-        let height = match self.mode {
-            Orientation::Landscape | Orientation::LandscapeFlipped => self.width,
-            Orientation::Portrait | Orientation::PortraitFlipped => self.height,
-        } as u16;
-        let scroll_lines = height as u16 - fixed_top_lines - fixed_bottom_lines;
-
-        self.command(
-            Command::VerticalScrollDefine,
-            &[
-                (fixed_top_lines >> 8) as u8,
-                (fixed_top_lines & 0xff) as u8,
-                (scroll_lines >> 8) as u8,
-                (scroll_lines & 0xff) as u8,
-                (fixed_bottom_lines >> 8) as u8,
-                (fixed_bottom_lines & 0xff) as u8,
-            ],
-        )?;
-
-        Ok(Scroller::new(fixed_top_lines, fixed_bottom_lines, height))
-    }
-
-    pub fn scroll_vertically(&mut self, scroller: &mut Scroller, num_lines: u16) -> Result {
-        scroller.top_offset += num_lines;
-        if scroller.top_offset > (scroller.height - scroller.fixed_bottom_lines) {
-            scroller.top_offset = scroller.fixed_top_lines
-                + (scroller.top_offset + scroller.fixed_bottom_lines - scroller.height)
-        }
-
-        self.command(
-            Command::VerticalScrollAddr,
-            &[
-                (scroller.top_offset >> 8) as u8,
-                (scroller.top_offset & 0xff) as u8,
-            ],
-        )
+        self.command(Command::HorizontalAddrStart, &[x0])?;
+//                   &[ (x0 >> 8) as u8, (x0 & 0xff) as u8])?;
+        self.command(Command::HorizontalAddrEnd, &[x1])?; 
+//                   &[ (x1 >> 8) as u8, (x1 & 0xff) as u8])?;
+        self.command(Command::VerticalAddrStart, &[y0])?;
+//                   &[ (y0 >> 8) as u8, (y0 & 0xff) as u8])?;
+        self.command(Command::VerticalAddrEnd, &[y1])?;
+//                   &[ (y1 >> 8) as u8, (y1 & 0xff) as u8])?;
+        self.command(Command::HorizontalGRAMAddrSet, &[x0])?; 
+//                   &[ (x0 >> 8) as u8, (x0 & 0xff) as u8])?;
+        self.command(Command::VerticalGRAMAddrSet, &[y0])
+//                   &[ (y0 >> 8) as u8, (y0 & 0xff) as u8])
     }
 
     /// Draw a rectangle on the screen, represented by top-left corner (x0, y0)
@@ -286,39 +207,9 @@ where
         self.draw_raw_iter(x0, y0, x1, y1, data.iter().copied())
     }
 
-    /// Change the orientation of the screen
-    pub fn set_orientation(&mut self, mode: Orientation) -> Result {
-        let was_landscape = match self.mode {
-            Orientation::Landscape | Orientation::LandscapeFlipped => true,
-            Orientation::Portrait | Orientation::PortraitFlipped => false,
-        };
-        let is_landscape = match mode {
-            Orientation::Portrait => {
-                self.command(Command::MemoryAccessControl, &[0x40 | 0x08])?;
-                false
-            }
-            Orientation::Landscape => {
-                self.command(Command::MemoryAccessControl, &[0x20 | 0x08])?;
-                true
-            }
-            Orientation::PortraitFlipped => {
-                self.command(Command::MemoryAccessControl, &[0x80 | 0x08])?;
-                false
-            }
-            Orientation::LandscapeFlipped => {
-                self.command(Command::MemoryAccessControl, &[0x40 | 0x80 | 0x20 | 0x08])?;
-                true
-            }
-        };
-        if was_landscape ^ is_landscape {
-            core::mem::swap(&mut self.height, &mut self.width);
-        }
-        self.mode = mode;
-        Ok(())
-    }
 }
 
-impl<IFACE, RESET, CS> Ili9325<IFACE, RESET, CS> {
+impl<IFACE> Ili9325<IFACE> {
     /// Get the current screen width. It can change based on the current orientation
     pub fn width(&self) -> usize {
         self.width
@@ -327,26 +218,6 @@ impl<IFACE, RESET, CS> Ili9325<IFACE, RESET, CS> {
     /// Get the current screen heighth. It can change based on the current orientation
     pub fn height(&self) -> usize {
         self.height
-    }
-}
-
-/// Scroller must be provided in order to scroll the screen. It can only be obtained
-/// by configuring the screen for scrolling.
-pub struct Scroller {
-    top_offset: u16,
-    fixed_bottom_lines: u16,
-    fixed_top_lines: u16,
-    height: u16,
-}
-
-impl Scroller {
-    fn new(fixed_top_lines: u16, fixed_bottom_lines: u16, height: u16) -> Scroller {
-        Scroller {
-            top_offset: fixed_top_lines,
-            fixed_top_lines,
-            fixed_bottom_lines,
-            height,
-        }
     }
 }
 

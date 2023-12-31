@@ -7,16 +7,15 @@ use embedded_graphics_core::{
 };
 use embedded_hal::digital::v2::OutputPin;
 
-impl<IFACE, RESET, CS> OriginDimensions for Ili9325<IFACE, RESET, CS> {
+impl<IFACE> OriginDimensions for Ili9325<IFACE> {
     fn size(&self) -> Size {
         Size::new(self.width() as u32, self.height() as u32)
     }
 }
 
-impl<IFACE, RESET, CS> DrawTarget for Ili9325<IFACE, RESET, CS>
+impl<IFACE> DrawTarget for Ili9325<IFACE>
 where
     IFACE: display_interface::WriteOnlyDataCommand,
-    CS: OutputPin,
 {
     type Error = display_interface::DisplayError;
 
