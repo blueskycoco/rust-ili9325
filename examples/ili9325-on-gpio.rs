@@ -11,12 +11,18 @@ use stm32f4xx_hal::prelude::*;
 use embedded_graphics::pixelcolor::Rgb565;
 use embedded_graphics::prelude::*;
 use embedded_graphics::primitives::{Circle, PrimitiveStyleBuilder, Rectangle, Triangle};
+use embedded_graphics::{
+    text::{
+        Text,
+    },
+    mono_font::{ascii::FONT_9X18_BOLD, MonoTextStyle},
+};
 use core::fmt::Write;
 use embedded_hal::blocking::delay::DelayMs;
 use embedded_hal::digital::v2::OutputPin;
 pub use display_interface::{DataFormat, DisplayError, WriteOnlyDataCommand};
 
-type Result<T = ()> = core::result::Result<T, DisplayError>;
+type ResultPin<T = ()> = core::result::Result<T, DisplayError>;
 pub struct ParallelStm32GpioIntf<TX, DC, WR, CS, RD> {
     tx: TX,
     gpio: GPIOB,
@@ -72,11 +78,12 @@ where
         (self.tx, self.dc, self.wr, self.cs, self.rd)
     }
 
-    fn write_iter(&mut self, iter: impl Iterator<Item = u16>) -> Result {
+    fn write_iter(&mut self, iter: impl Iterator<Item = u16>) -> ResultPin {
         for value in iter {
             let _ = self.cs.set_low().map_err(|_| DisplayError::DCError);
             let _ = self.wr.set_low().map_err(|_| DisplayError::BusWriteError)?;
             let _ = self.gpio.odr.write(|w| unsafe { w.bits(value as u32) } );
+            //writeln!(self.tx, "tx: {:#x}\r", value).unwrap();
             let _ = self.wr.set_high().map_err(|_| DisplayError::BusWriteError)?;
             let _ = self.cs.set_high().map_err(|_| DisplayError::DCError);
         }
@@ -84,7 +91,7 @@ where
         Ok(())
     }
 
-    fn write_data(&mut self, data: DataFormat<'_>) -> Result {
+    fn write_data(&mut self, data: DataFormat<'_>) -> ResultPin {
         match data {
             DataFormat::U8(slice) => self.write_iter(slice.iter().copied().map(u16::from)),
             DataFormat::U8Iter(iter) => self.write_iter(iter.map(u16::from)),
@@ -106,12 +113,12 @@ where
     CS: OutputPin,
     RD: OutputPin,
 {
-    fn send_commands(&mut self, cmds: DataFormat<'_>) -> Result {
+    fn send_commands(&mut self, cmds: DataFormat<'_>) -> ResultPin {
         self.dc.set_low().map_err(|_| DisplayError::DCError)?;
         self.write_data(cmds)
     }
 
-    fn send_data(&mut self, buf: DataFormat<'_>) -> Result {
+    fn send_data(&mut self, buf: DataFormat<'_>) -> ResultPin {
         self.dc.set_high().map_err(|_| DisplayError::DCError)?;
         self.write_data(buf)
     }
@@ -138,7 +145,7 @@ fn main() -> ! {
     let gpioc = dp.GPIOC.split();
     let gpioa = dp.GPIOA.split();
     let mut tx = dp.USART2.tx(gpioa.pa2, 115200.bps(), &clocks).unwrap();
-    writeln!(tx, "hello world\r\n").unwrap();
+    writeln!(tx, "ILI9325 Lcd\r").unwrap();
     let interface = ParallelStm32GpioIntf::new(
                                               &mut delay,
                                               tx,
@@ -201,6 +208,9 @@ fn main() -> ! {
         .draw(&mut ili9325)
         .unwrap();
         
+    Text::new("Hello Eva, I love Eva", Point::new(10, 200), MonoTextStyle::new(&FONT_9X18_BOLD, Rgb565::RED))
+        .draw(&mut ili9325)
+        .unwrap();
     loop {
     }
 }

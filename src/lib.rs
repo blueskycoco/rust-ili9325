@@ -119,6 +119,10 @@ where
         ili9325.command(Command::Reg95,                 &[0x0110])?;
         ili9325.command(Command::DispCtl1,              &[0x0173])?;
         delay.delay_ms(50);
+        ili9325.set_window(0, 0, 239, 319)?;
+        for _ in 0..240*320 {
+            ili9325.write_iter([0x0000].iter().copied())?;
+        }
         Ok(ili9325)
     }
 }
@@ -133,8 +137,7 @@ where
     }
 
     fn write_iter<I: IntoIterator<Item = u16>>(&mut self, data: I) -> Result {
-        self.command(Command::WriteDataToGram, &[])?;
-        //self.interface.send_commands(U8Iter(&mut once(Command::WriteDataToGram as u8)))?;
+        self.interface.send_commands(U8Iter(&mut once(Command::WriteDataToGram as u8)))?;
         self.interface.send_data(U16BEIter(&mut data.into_iter()))
     }
 
