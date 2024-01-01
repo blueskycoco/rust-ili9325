@@ -144,6 +144,8 @@ fn main() -> ! {
     let mut delay = cp.SYST.delay(&clocks);
     let gpioc = dp.GPIOC.split();
     let gpioa = dp.GPIOA.split();
+    let mut led1 = gpioa.pa11.into_push_pull_output();
+    let mut led2 = gpioa.pa12.into_push_pull_output();
     let mut tx = dp.USART2.tx(gpioa.pa2, 115200.bps(), &clocks).unwrap();
     writeln!(tx, "ILI9325 Lcd\r").unwrap();
     let interface = ParallelStm32GpioIntf::new(
@@ -212,5 +214,11 @@ fn main() -> ! {
         .draw(&mut ili9325)
         .unwrap();
     loop {
+        let _= led1.set_low();
+        led2.set_high();
+        delay.delay_ms(1000 as u16);
+        led1.set_high();
+        led2.set_low();
+        delay.delay_ms(1000 as u16);
     }
 }
