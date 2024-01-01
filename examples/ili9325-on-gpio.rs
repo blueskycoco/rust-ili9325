@@ -11,13 +11,14 @@ use stm32f4xx_hal::prelude::*;
 use embedded_graphics::pixelcolor::Rgb565;
 use embedded_graphics::prelude::*;
 use embedded_graphics::primitives::{Circle, PrimitiveStyleBuilder, Rectangle, Triangle};
-use cortex_m_semihosting::hprintln;
+use core::fmt::Write;
 
 use embedded_hal::digital::v2::OutputPin;
 pub use display_interface::{DataFormat, DisplayError, WriteOnlyDataCommand};
 
 type Result<T = ()> = core::result::Result<T, DisplayError>;
-pub struct ParallelStm32GpioIntf<DC, WR, CS, RD> {
+pub struct ParallelStm32GpioIntf<TX, DC, WR, CS, RD> {
+    tx: TX,
     gpio: GPIOB,
     dc: DC,
     wr: WR,
@@ -25,20 +26,23 @@ pub struct ParallelStm32GpioIntf<DC, WR, CS, RD> {
     rd: RD,
 }
 
-impl<DC, WR, CS, RD> ParallelStm32GpioIntf<DC, WR, CS, RD>
+impl<TX, DC, WR, CS, RD> ParallelStm32GpioIntf<TX, DC, WR, CS, RD>
 where
+    TX: Write,
     DC: OutputPin,
     WR: OutputPin,
     CS: OutputPin,
     RD: OutputPin,
 {
     /// Create new parallel GPIO interface for communication with a display driver
-    pub fn new(gpio: GPIOB, mut dc: DC, mut wr: WR, mut cs: CS, mut rd: RD) -> Self {
-        //read id first
+    pub fn new(mut tx: TX, gpio: GPIOB, mut dc: DC, mut wr: WR, mut cs: CS, mut rd: RD) -> Self {
+        // config gpiob pushpull output, high speed.
+        writeln!(tx, "in ParallelStm32GpioIntf\r\n").unwrap();
         let _ = gpio.moder.write(|w| unsafe { w.bits(0x55555555) });
         let _ = gpio.pupdr.write(|w| unsafe { w.bits(0x55555555) });
         let _ = gpio.ospeedr.write(|w| unsafe { w.bits(0xffffffff) });
-        hprintln!("moder: {:#x}", gpio.moder.read().bits());
+        //read id first
+        writeln!(tx, "moder: {:#x}\r", gpio.moder.read().bits()).unwrap();
         let _ = cs.set_low().map_err(|_| DisplayError::DCError);
         let _ = dc.set_low().map_err(|_| DisplayError::DCError);
         let _ = rd.set_high().map_err(|_| DisplayError::DCError);
@@ -48,32 +52,30 @@ where
         let _ = cs.set_high().map_err(|_| DisplayError::DCError);
         
         let _ = gpio.moder.write(|w| unsafe { w.bits(0x00 as u32) });
-        hprintln!("moder: {:#x}", gpio.moder.read().bits());
+        writeln!(tx, "moder: {:#x}\r", gpio.moder.read().bits()).unwrap();
         let _ = cs.set_low().map_err(|_| DisplayError::DCError);
         let _ = dc.set_high().map_err(|_| DisplayError::DCError);
         let _ = wr.set_high().map_err(|_| DisplayError::BusWriteError);
         let _ = rd.set_low().map_err(|_| DisplayError::DCError);
-        hprintln!("ili9325 id: {:#x}", gpio.idr.read().bits());
+        writeln!(tx, "ili9325 id: {:#x}\r", gpio.idr.read().bits()).unwrap();
         let _ = gpio.moder.write(|w| unsafe { w.bits(0x55555555) });
-        hprintln!("moder: {:#x}", gpio.moder.read().bits());
+        writeln!(tx, "moder: {:#x}\r", gpio.moder.read().bits()).unwrap();
         let _ = rd.set_high().map_err(|_| DisplayError::DCError);
         let _ = cs.set_high().map_err(|_| DisplayError::DCError);
-        Self { gpio, dc, wr, cs, rd }
+        Self { tx, gpio, dc, wr, cs, rd }
     }
 
     /// Consume the display interface and return
     /// the bus and GPIO pins used by it
-    pub fn release(self) -> (DC, WR, CS, RD) {
-        (self.dc, self.wr, self.cs, self.rd)
+    pub fn release(self) -> (TX, DC, WR, CS, RD) {
+        (self.tx, self.dc, self.wr, self.cs, self.rd)
     }
 
     fn write_iter(&mut self, iter: impl Iterator<Item = u16>) -> Result {
         for value in iter {
             let _ = self.cs.set_low().map_err(|_| DisplayError::DCError);
             let _ = self.wr.set_low().map_err(|_| DisplayError::BusWriteError)?;
-//            hprintln!("value w is {:#x}", value);
             let _ = self.gpio.odr.write(|w| unsafe { w.bits(value as u32) } );
-//            hprintln!("value r is {:#x}", self.gpio.odr.read().bits());
             let _ = self.wr.set_high().map_err(|_| DisplayError::BusWriteError)?;
             let _ = self.cs.set_high().map_err(|_| DisplayError::DCError);
         }
@@ -95,8 +97,9 @@ where
     }
 }
 
-impl<DC, WR, CS, RD> WriteOnlyDataCommand for ParallelStm32GpioIntf<DC, WR, CS, RD>
+impl<TX, DC, WR, CS, RD> WriteOnlyDataCommand for ParallelStm32GpioIntf<TX, DC, WR, CS, RD>
 where
+    TX: Write,
     DC: OutputPin,
     WR: OutputPin,
     CS: OutputPin,
@@ -118,9 +121,9 @@ fn main() -> ! {
     let cp = CorePeripherals::take().unwrap();
     let dp = Peripherals::take().unwrap();
 
-    hprintln!("ahb1enr: {:#x}", dp.RCC.ahb1enr.read().bits());
+//    hprintln!("ahb1enr: {:#x}", dp.RCC.ahb1enr.read().bits());
     dp.RCC.ahb1enr.write(|w| w.gpioben().enabled());
-    hprintln!("ahb1enr: {:#x}", dp.RCC.ahb1enr.read().bits());
+//    hprintln!("ahb1enr: {:#x}", dp.RCC.ahb1enr.read().bits());
     let rcc = dp.RCC.constrain();
     // Make HCLK faster to allow updating the display more quickly
     //let clocks = rcc.cfgr.hclk(180.MHz()).freeze();
@@ -132,7 +135,11 @@ fn main() -> ! {
         .freeze();
     let mut delay = cp.SYST.delay(&clocks);
     let gpioc = dp.GPIOC.split();
+    let gpioa = dp.GPIOA.split();
+    let mut tx = dp.USART2.tx(gpioa.pa2, 115200.bps(), &clocks).unwrap();
+    writeln!(tx, "hello world\r\n").unwrap();
     let interface = ParallelStm32GpioIntf::new(
+                                              tx,
                                               dp.GPIOB,
                                               gpioc.pc8.into_push_pull_output(),
                                               gpioc.pc7.into_push_pull_output(),
@@ -148,7 +155,6 @@ fn main() -> ! {
     let yoffset = 24;
     let x_max = (ili9325.width() as i32) - 1;
     let y_max = (ili9325.height() as i32) - 1;
-//    ili9325.draw_raw_slice(0, 0, 240, 320, &[0x8700, 0x1122, 0x3389, 0x7687, 0x1123, 0x5578]).unwrap();
 
     let red_style = PrimitiveStyleBuilder::new()
         .stroke_color(Rgb565::RED)
