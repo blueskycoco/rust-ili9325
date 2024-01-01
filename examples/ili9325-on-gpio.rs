@@ -12,7 +12,7 @@ use embedded_graphics::pixelcolor::Rgb565;
 use embedded_graphics::prelude::*;
 use embedded_graphics::primitives::{Circle, PrimitiveStyleBuilder, Rectangle, Triangle};
 use core::fmt::Write;
-
+use embedded_hal::blocking::delay::DelayMs;
 use embedded_hal::digital::v2::OutputPin;
 pub use display_interface::{DataFormat, DisplayError, WriteOnlyDataCommand};
 
@@ -35,14 +35,14 @@ where
     RD: OutputPin,
 {
     /// Create new parallel GPIO interface for communication with a display driver
-    pub fn new(mut tx: TX, gpio: GPIOB, mut dc: DC, mut wr: WR, mut cs: CS, mut rd: RD) -> Self {
+    pub fn new(delay: &mut dyn DelayMs<u16>, mut tx: TX, gpio: GPIOB, mut dc: DC, mut wr: WR, mut cs: CS, mut rd: RD) -> Self {
         // config gpiob pushpull output, high speed.
-        writeln!(tx, "in ParallelStm32GpioIntf\r\n").unwrap();
+        //writeln!(tx, "in ParallelStm32GpioIntf\r\n").unwrap();
         let _ = gpio.moder.write(|w| unsafe { w.bits(0x55555555) });
         let _ = gpio.pupdr.write(|w| unsafe { w.bits(0x55555555) });
         let _ = gpio.ospeedr.write(|w| unsafe { w.bits(0xffffffff) });
         //read id first
-        writeln!(tx, "moder: {:#x}\r", gpio.moder.read().bits()).unwrap();
+        //writeln!(tx, "moder: {:#x}\r", gpio.moder.read().bits()).unwrap();
         let _ = cs.set_low().map_err(|_| DisplayError::DCError);
         let _ = dc.set_low().map_err(|_| DisplayError::DCError);
         let _ = rd.set_high().map_err(|_| DisplayError::DCError);
@@ -52,14 +52,15 @@ where
         let _ = cs.set_high().map_err(|_| DisplayError::DCError);
         
         let _ = gpio.moder.write(|w| unsafe { w.bits(0x00 as u32) });
-        writeln!(tx, "moder: {:#x}\r", gpio.moder.read().bits()).unwrap();
+        //writeln!(tx, "moder: {:#x}\r", gpio.moder.read().bits()).unwrap();
         let _ = cs.set_low().map_err(|_| DisplayError::DCError);
         let _ = dc.set_high().map_err(|_| DisplayError::DCError);
         let _ = wr.set_high().map_err(|_| DisplayError::BusWriteError);
         let _ = rd.set_low().map_err(|_| DisplayError::DCError);
+        delay.delay_ms(1);
         writeln!(tx, "ili9325 id: {:#x}\r", gpio.idr.read().bits()).unwrap();
         let _ = gpio.moder.write(|w| unsafe { w.bits(0x55555555) });
-        writeln!(tx, "moder: {:#x}\r", gpio.moder.read().bits()).unwrap();
+        //writeln!(tx, "moder: {:#x}\r", gpio.moder.read().bits()).unwrap();
         let _ = rd.set_high().map_err(|_| DisplayError::DCError);
         let _ = cs.set_high().map_err(|_| DisplayError::DCError);
         Self { tx, gpio, dc, wr, cs, rd }
@@ -139,6 +140,7 @@ fn main() -> ! {
     let mut tx = dp.USART2.tx(gpioa.pa2, 115200.bps(), &clocks).unwrap();
     writeln!(tx, "hello world\r\n").unwrap();
     let interface = ParallelStm32GpioIntf::new(
+                                              &mut delay,
                                               tx,
                                               dp.GPIOB,
                                               gpioc.pc8.into_push_pull_output(),
