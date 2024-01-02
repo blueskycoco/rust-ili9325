@@ -5,7 +5,7 @@ use cortex_m_rt::entry;
 use panic_semihosting as _;
 
 use ili9325::{Ili9325};
-pub use ili9325::{DisplaySize240x320, DisplaySize320x480};
+pub use ili9325::{DisplaySize240x320, DisplaySize320x240};
 use stm32f4xx_hal::pac::{CorePeripherals, Peripherals, GPIOB};
 use stm32f4xx_hal::prelude::*;
 use embedded_graphics::pixelcolor::Rgb565;
@@ -158,11 +158,12 @@ fn main() -> ! {
                                               gpioc.pc6.into_push_pull_output()
                                             );
 
-   let mut ili9325 = Ili9325::new(
+    let mut ili9325 = Ili9325::new(
                                     interface,
                                     &mut delay,
                                     DisplaySize240x320
                                 ).unwrap();
+    let _ = ili9325.clear(Rgb565::BLACK);
     let yoffset = 24;
     let x_max = (ili9325.width() as i32) - 1;
     let y_max = (ili9325.height() as i32) - 1;
@@ -210,7 +211,7 @@ fn main() -> ! {
         .draw(&mut ili9325)
         .unwrap();
         
-    Text::new("Hello Eva, I love Eva", Point::new(10, 200), MonoTextStyle::new(&FONT_9X18_BOLD, Rgb565::RED))
+    Text::new("Hello Eva, I love Eva", Point::new(10, 200), MonoTextStyle::new(&FONT_9X18_BOLD, Rgb565::YELLOW))
         .draw(&mut ili9325)
         .unwrap();
     loop {

@@ -5,6 +5,8 @@ use embedded_hal::blocking::delay::DelayMs;
 use core::iter::once;
 use display_interface::DataFormat::{U16BEIter, U8Iter, U16};
 use display_interface::WriteOnlyDataCommand;
+use embedded_graphics::pixelcolor::Rgb565;
+use embedded_graphics::prelude::*;
 
 #[cfg(feature = "graphics")]
 mod graphics_core;
@@ -32,11 +34,11 @@ impl DisplaySize for DisplaySize240x320 {
 }
 
 /// Generic display size of 320x480 pixels
-pub struct DisplaySize320x480;
+pub struct DisplaySize320x240;
 
-impl DisplaySize for DisplaySize320x480 {
+impl DisplaySize for DisplaySize320x240 {
     const WIDTH: usize = 320;
-    const HEIGHT: usize = 480;
+    const HEIGHT: usize = 240;
 }
 
 /// There are two method for drawing to the screen:
@@ -120,10 +122,17 @@ where
         ili9325.command(Command::DispCtl1,              &[0x0173])?;
         delay.delay_ms(50);
         ili9325.set_window(0, 0, 239, 319)?;
-        for _ in 0..240*320 {
-            ili9325.write_iter([0x0000].iter().copied())?;
-        }
+//        for _ in 0..240*320 {
+//            ili9325.write_iter([0x0000].iter().copied())?;
+//        }
         Ok(ili9325)
+    }
+
+    pub fn clear(&mut self, color: Rgb565) -> Result {
+        for _ in 0..self.width*self.height {
+            self.write_iter([color.into_storage()].iter().copied())?;
+        }
+        Ok(())
     }
 }
 
