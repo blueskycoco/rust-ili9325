@@ -8,13 +8,11 @@ use ili9325::{Ili9325};
 pub use ili9325::{DisplaySize240x320, DisplaySize320x240};
 use stm32f4xx_hal::pac::{CorePeripherals, Peripherals, GPIOB};
 use stm32f4xx_hal::prelude::*;
-use embedded_graphics::pixelcolor::Rgb565;
-use embedded_graphics::prelude::*;
-use embedded_graphics::primitives::{Circle, PrimitiveStyleBuilder, Rectangle, Triangle};
 use embedded_graphics::{
-    text::{
-        Text,
-    },
+    text::{Text,},
+    prelude::*,
+    pixelcolor::Rgb565,
+    primitives::{Circle, PrimitiveStyleBuilder, Rectangle, Triangle},
     mono_font::{ascii::FONT_9X18_BOLD, MonoTextStyle},
 };
 use core::fmt::Write;
@@ -41,7 +39,8 @@ where
     RD: OutputPin,
 {
     /// Create new parallel GPIO interface for communication with a display driver
-    pub fn new(delay: &mut dyn DelayMs<u16>, mut tx: TX, gpio: GPIOB, mut dc: DC, mut wr: WR, mut cs: CS, mut rd: RD) -> Self {
+    pub fn new(delay: &mut dyn DelayMs<u16>, mut tx: TX, gpio: GPIOB,
+               mut dc: DC, mut wr: WR, mut cs: CS, mut rd: RD) -> Self {
         // config gpiob pushpull output, high speed.
         //writeln!(tx, "in ParallelStm32GpioIntf\r\n").unwrap();
         let _ = gpio.moder.write(|w| unsafe { w.bits(0x55555555) });
@@ -93,7 +92,8 @@ where
 
     fn write_data(&mut self, data: DataFormat<'_>) -> ResultPin {
         match data {
-            DataFormat::U8(slice) => self.write_iter(slice.iter().copied().map(u16::from)),
+            DataFormat::U8(slice) => self.write_iter(slice.iter().copied()
+                                                     .map(u16::from)),
             DataFormat::U8Iter(iter) => self.write_iter(iter.map(u16::from)),
             DataFormat::U16(slice) => self.write_iter(slice.iter().copied()),
             DataFormat::U16BE(slice) => self.write_iter(slice.iter().copied()),
@@ -105,7 +105,8 @@ where
     }
 }
 
-impl<TX, DC, WR, CS, RD> WriteOnlyDataCommand for ParallelStm32GpioIntf<TX, DC, WR, CS, RD>
+impl<TX, DC, WR, CS, RD> WriteOnlyDataCommand for
+    ParallelStm32GpioIntf<TX, DC, WR, CS, RD>
 where
     TX: Write,
     DC: OutputPin,
@@ -200,7 +201,8 @@ fn main() -> ! {
     .unwrap();
 
     // square
-    Rectangle::with_corners(Point::new(54, yoffset), Point::new(54 + 16, 16 + yoffset))
+    Rectangle::with_corners(Point::new(54, yoffset), Point::new(54 + 16,
+                                                                16 + yoffset))
         .into_styled(green_style)
         .draw(&mut ili9325)
         .unwrap();
@@ -211,7 +213,8 @@ fn main() -> ! {
         .draw(&mut ili9325)
         .unwrap();
         
-    Text::new("Hello Eva, I love Eva", Point::new(10, 200), MonoTextStyle::new(&FONT_9X18_BOLD, Rgb565::YELLOW))
+    Text::new("Hello Eva, I love Eva", Point::new(10, 200),
+                MonoTextStyle::new(&FONT_9X18_BOLD, Rgb565::YELLOW))
         .draw(&mut ili9325)
         .unwrap();
     loop {

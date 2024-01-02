@@ -122,9 +122,6 @@ where
         ili9325.command(Command::DispCtl1,              &[0x0173])?;
         delay.delay_ms(50);
         ili9325.set_window(0, 0, 239, 319)?;
-//        for _ in 0..240*320 {
-//            ili9325.write_iter([0x0000].iter().copied())?;
-//        }
         Ok(ili9325)
     }
 
