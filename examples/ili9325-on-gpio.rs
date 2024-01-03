@@ -6,8 +6,13 @@ use panic_semihosting as _;
 
 use ili9325::{Ili9325};
 pub use ili9325::{DisplaySize240x320, DisplaySize320x240};
-use stm32f4xx_hal::pac::{CorePeripherals, Peripherals, GPIOB};
+use stm32f4xx_hal::pac::{CorePeripherals, Peripherals, GPIOB, NVIC};
+use stm32f4xx_hal::interrupt;
+use stm32f4xx_hal::gpio::{Edge, Input, Output, PC1, PA12};
 use stm32f4xx_hal::prelude::*;
+use core::cell::{Cell, RefCell};
+use core::ops::DerefMut;
+use cortex_m::interrupt::{free, CriticalSection, Mutex};
 use embedded_graphics::{
     text::{Text,},
     prelude::*,
@@ -125,10 +130,12 @@ where
     }
 }
 
+static TOUCH: Mutex<RefCell<Option<PC1<Input>>>> = Mutex::new(RefCell::new(None));
+static LED2: Mutex<RefCell<Option<PA12<Output>>>> = Mutex::new(RefCell::new(None));
 #[entry]
 fn main() -> ! {
     let cp = CorePeripherals::take().unwrap();
-    let dp = Peripherals::take().unwrap();
+    let mut dp = Peripherals::take().unwrap();
 
 //    hprintln!("ahb1enr: {:#x}", dp.RCC.ahb1enr.read().bits());
     dp.RCC.ahb1enr.write(|w| w.gpioben().enabled());
@@ -142,11 +149,33 @@ fn main() -> ! {
         .pclk1(45.MHz())                                                         
         .pclk2(90.MHz())                                                         
         .freeze();
-    let mut delay = cp.SYST.delay(&clocks);
+    let mut syscfg = dp.SYSCFG.constrain();
+
+    // Create a button input with an interrupt
     let gpioc = dp.GPIOC.split();
+    let mut touch_int = gpioc.pc1.into_pull_up_input();
+    touch_int.make_interrupt_source(&mut syscfg);
+    touch_int.enable_interrupt(&mut dp.EXTI);
+    touch_int.trigger_on_edge(&mut dp.EXTI, Edge::Falling);
+    let btn_int_num = touch_int.interrupt(); // hal::pac::Interrupt::EXTI15_10
+
+    free(|cs| {
+         TOUCH.borrow(cs).replace(Some(touch_int));
+    });
+
+    // Enable interrupts
+    NVIC::unpend(btn_int_num);
+    unsafe {
+         NVIC::unmask(btn_int_num);
+    };
+    let mut delay = cp.SYST.delay(&clocks);
+    //let gpioc = dp.GPIOC.split();
     let gpioa = dp.GPIOA.split();
     let mut led1 = gpioa.pa11.into_push_pull_output();
-    let mut led2 = gpioa.pa12.into_push_pull_output();
+    let led2 = gpioa.pa12.into_push_pull_output();
+    free(|cs| {
+        LED2.borrow(cs).replace(Some(led2));
+    });
     let mut tx = dp.USART2.tx(gpioa.pa2, 115200.bps(), &clocks).unwrap();
     writeln!(tx, "ILI9325 Lcd\r").unwrap();
     let interface = ParallelStm32GpioIntf::new(
@@ -219,10 +248,27 @@ fn main() -> ! {
         .unwrap();
     loop {
         let _= led1.set_low();
-        led2.set_high();
+//        led2.set_high();
         delay.delay_ms(1000 as u16);
         led1.set_high();
-        led2.set_low();
+//        led2.set_low();
         delay.delay_ms(1000 as u16);
     }
+}
+
+#[interrupt]
+fn EXTI1() {
+    free(|cs| {
+        let mut touch_ref = TOUCH.borrow(cs).borrow_mut();
+        if let Some(ref mut touch) = touch_ref.deref_mut() {
+            // We cheat and don't bother checking _which_ exact interrupt line fired - there's only
+            // ever going to be one in this example.
+            touch.clear_interrupt_pending_bit();
+            let mut led_ref = LED2.borrow(cs).borrow_mut();
+            if let Some(ref mut led) = led_ref.deref_mut() {
+                led.toggle();
+            }
+
+            }
+    });
 }
