@@ -12,7 +12,7 @@ use stm32f4xx_hal::gpio::{Edge, Input, Output, PC1, PA12};
 use stm32f4xx_hal::prelude::*;
 use core::cell::{Cell, RefCell};
 use core::ops::DerefMut;
-use cortex_m::interrupt::{free, CriticalSection, Mutex};
+use cortex_m::interrupt::{free, Mutex};
 use embedded_graphics::{
     text::{Text,},
     prelude::*,
@@ -21,11 +21,88 @@ use embedded_graphics::{
     mono_font::{ascii::FONT_9X18_BOLD, MonoTextStyle},
 };
 use core::fmt::Write;
-use embedded_hal::blocking::delay::DelayMs;
-use embedded_hal::digital::v2::OutputPin;
+use embedded_hal::blocking::delay::{DelayMs, DelayUs};
+use embedded_hal::digital::v2::{OutputPin, InputPin};
 pub use display_interface::{DataFormat, DisplayError, WriteOnlyDataCommand};
 
 type ResultPin<T = ()> = core::result::Result<T, DisplayError>;
+
+pub struct TouchStm32GpioIntf<CS, CLK, DIN, DOUT> {
+    cs: CS,
+    clk: CLK,
+    din: DIN,
+    dout: DOUT,
+}
+
+impl<CS, CLK, DIN, DOUT> TouchStm32GpioIntf<CS, CLK, DIN, DOUT>
+where
+    CS: OutputPin,
+    CLK: OutputPin,
+    DIN: OutputPin,
+    DOUT: InputPin,
+{
+    pub fn new(mut cs: CS, mut clk: CLK, mut din: DIN, dout: DOUT) -> Self {
+        let _ = clk.set_low();
+        let _ = cs.set_high();
+        let _ = din.set_high();
+        let _ = clk.set_high();
+        let _ = cs.set_low();
+        Self { cs, clk, din, dout}
+    }
+
+    pub fn release(self) -> (CS, CLK, DIN, DOUT) {
+        (self.cs, self.clk, self.din, self.dout)
+    }
+
+    pub fn get_pixel(&mut self, delay: &mut dyn DelayUs<u16>) -> (u16, u16) {
+        let (x1, y1) = self.touch_read(delay);
+        let (x2, y2) = self.touch_read(delay);
+        if (x1.abs_diff(x2) < 15) && (y1.abs_diff(y2) < 15) {
+            let x = (x1 + x2) / 2;
+            let y = (y1 + y2) / 2;
+            if (x > 280) && (y > 340) {
+                return (240 * (x - 280) / (3800 - 280),
+                        320 * (y - 340) / (3600 - 340));
+            } else {
+                return (0, 0);
+            }
+        }
+
+        (0, 0)
+    }
+
+    fn touch_read(&mut self, delay: &mut dyn DelayUs<u16>) -> (u16, u16) {
+        let _ = self.cs.set_low();
+        
+        self.reg_w(0x90, delay);
+        let _ = self.clk.set_high();
+        delay.delay_us(10);
+        let _ = self.clk.set_low();
+        delay.delay_us(10);
+        let x = self.reg_r(delay);
+        
+        self.reg_w(0xd0, delay);
+        let _ = self.clk.set_high();
+        delay.delay_us(10);
+        let _ = self.clk.set_low();
+        delay.delay_us(10);
+        let y = self.reg_r(delay);
+        
+        let _ = self.cs.set_high();
+        (x, y)
+    }
+
+    fn reg_w(&mut self, reg: u8, delay: &mut dyn DelayUs<u16>) {
+        delay.delay_us(100);
+    }
+
+    fn reg_r(&mut self, delay: &mut dyn DelayUs<u16>) -> u16 {
+        delay.delay_us(100);
+        0
+    }
+
+}
+
 pub struct ParallelStm32GpioIntf<TX, DC, WR, CS, RD> {
     tx: TX,
     gpio: GPIOB,
@@ -130,6 +207,7 @@ where
     }
 }
 
+static STATE: Mutex<Cell<u8>> = Mutex::new(Cell::new(0u8));
 static TOUCH: Mutex<RefCell<Option<PC1<Input>>>> = Mutex::new(RefCell::new(None));
 static LED2: Mutex<RefCell<Option<PA12<Output>>>> = Mutex::new(RefCell::new(None));
 #[entry]
@@ -137,12 +215,9 @@ fn main() -> ! {
     let cp = CorePeripherals::take().unwrap();
     let mut dp = Peripherals::take().unwrap();
 
-//    hprintln!("ahb1enr: {:#x}", dp.RCC.ahb1enr.read().bits());
     dp.RCC.ahb1enr.write(|w| w.gpioben().enabled());
-//    hprintln!("ahb1enr: {:#x}", dp.RCC.ahb1enr.read().bits());
     let rcc = dp.RCC.constrain();
     // Make HCLK faster to allow updating the display more quickly
-    //let clocks = rcc.cfgr.hclk(180.MHz()).freeze();
     let clocks = rcc.cfgr                                                                     
         .hclk(180.MHz())                                                         
         .sysclk(180.MHz())                                                       
@@ -246,14 +321,42 @@ fn main() -> ! {
                 MonoTextStyle::new(&FONT_9X18_BOLD, Rgb565::YELLOW))
         .draw(&mut ili9325)
         .unwrap();
+    let touch_din = gpioc.pc3.into_push_pull_output();
+    let touch_cs = gpioc.pc13.into_push_pull_output();
+    let touch_clk = gpioc.pc0.into_push_pull_output();
+    let touch_dout = gpioc.pc2.into_pull_up_input();
+    let mut touch = TouchStm32GpioIntf::new(touch_cs, touch_clk,
+                                            touch_din, touch_dout);
     loop {
-        let _= led1.set_low();
-//        led2.set_high();
+/*        let _= led1.set_low();
+        led2_set(true);
         delay.delay_ms(1000 as u16);
         led1.set_high();
-//        led2.set_low();
+        led2_set(false);
         delay.delay_ms(1000 as u16);
+        */
+        let state = free(|cs| STATE.borrow(cs).get());
+        match state {
+            1 => {
+                free(|cs| STATE.borrow(cs).replace(0));
+                led1.toggle();
+                let (_, _) =touch.get_pixel(&mut delay);
+            },
+            _ => {},
+        };
     }
+}
+
+fn led2_set(high: bool) {
+    free(|cs| {
+    let mut led_ref = LED2.borrow(cs).borrow_mut();
+    if let Some(ref mut led) = led_ref.deref_mut() {
+        match high {
+            true => led.set_high(),
+            _ => led.set_low(),
+        }
+    }
+    });
 }
 
 #[interrupt]
@@ -261,13 +364,12 @@ fn EXTI1() {
     free(|cs| {
         let mut touch_ref = TOUCH.borrow(cs).borrow_mut();
         if let Some(ref mut touch) = touch_ref.deref_mut() {
-            // We cheat and don't bother checking _which_ exact interrupt line fired - there's only
-            // ever going to be one in this example.
             touch.clear_interrupt_pending_bit();
-            let mut led_ref = LED2.borrow(cs).borrow_mut();
-            if let Some(ref mut led) = led_ref.deref_mut() {
-                led.toggle();
-            }
+            free(|cs| STATE.borrow(cs).replace(1));
+//            let mut led_ref = LED2.borrow(cs).borrow_mut();
+//            if let Some(ref mut led) = led_ref.deref_mut() {
+//                led.toggle();
+//            }
 
             }
     });
