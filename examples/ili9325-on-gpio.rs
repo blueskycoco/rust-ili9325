@@ -93,12 +93,34 @@ where
     }
 
     fn reg_w(&mut self, reg: u8, delay: &mut dyn DelayUs<u16>) {
-        delay.delay_us(100);
+        let mut i_reg = reg;
+        for _ in 0..8 {
+            if i_reg & 0x80 == 0x80 {
+                let _ = self.din.set_high();
+            } else {
+                let _ = self.din.set_low();
+            }
+            let _ = self.clk.set_low();
+            delay.delay_us(100);
+            let _ = self.clk.set_high();
+            delay.delay_us(100);
+            i_reg = i_reg << 1;
+        }
     }
 
     fn reg_r(&mut self, delay: &mut dyn DelayUs<u16>) -> u16 {
-        delay.delay_us(100);
-        0
+        let mut data = 0;
+        for _ in 0..12 {
+            data = data << 1;
+            let _ = self.clk.set_high();
+            delay.delay_us(100);
+            let _ = self.clk.set_low();
+            delay.delay_us(100);
+            if self.dout.is_high().expect("") {
+                data = data + 1;
+            }
+        }
+        data
     }
 
 }
