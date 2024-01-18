@@ -76,16 +76,16 @@ where
         
         self.reg_w(0x90, delay);
         let _ = self.clk.set_high();
-        delay.delay_us(10);
+        delay.delay_us(100);
         let _ = self.clk.set_low();
-        delay.delay_us(10);
+        delay.delay_us(100);
         let x = self.reg_r(delay);
         
         self.reg_w(0xd0, delay);
         let _ = self.clk.set_high();
-        delay.delay_us(10);
+        delay.delay_us(100);
         let _ = self.clk.set_low();
-        delay.delay_us(10);
+        delay.delay_us(100);
         let y = self.reg_r(delay);
         
         let _ = self.cs.set_high();
@@ -116,8 +116,9 @@ where
             delay.delay_us(100);
             let _ = self.clk.set_low();
             delay.delay_us(100);
-            if self.dout.is_high().expect("") {
-                data = data + 1;
+            match self.dout.is_high() {
+                Ok(_) => data = data + 1,
+                _ => data = data,
             }
         }
         data
@@ -125,8 +126,7 @@ where
 
 }
 
-pub struct ParallelStm32GpioIntf<TX, DC, WR, CS, RD> {
-    tx: TX,
+pub struct ParallelStm32GpioIntf<DC, WR, CS, RD> {
     gpio: GPIOB,
     dc: DC,
     wr: WR,
@@ -134,16 +134,15 @@ pub struct ParallelStm32GpioIntf<TX, DC, WR, CS, RD> {
     rd: RD,
 }
 
-impl<TX, DC, WR, CS, RD> ParallelStm32GpioIntf<TX, DC, WR, CS, RD>
+impl<DC, WR, CS, RD> ParallelStm32GpioIntf<DC, WR, CS, RD>
 where
-    TX: Write,
     DC: OutputPin,
     WR: OutputPin,
     CS: OutputPin,
     RD: OutputPin,
 {
     /// Create new parallel GPIO interface for communication with a display driver
-    pub fn new(delay: &mut dyn DelayMs<u16>, mut tx: TX, gpio: GPIOB,
+    pub fn new(delay: &mut dyn DelayMs<u16>, tx: &mut dyn Write, gpio: GPIOB,
                mut dc: DC, mut wr: WR, mut cs: CS, mut rd: RD) -> Self {
         // config gpiob pushpull output, high speed.
         //writeln!(tx, "in ParallelStm32GpioIntf\r\n").unwrap();
@@ -172,13 +171,13 @@ where
         //writeln!(tx, "moder: {:#x}\r", gpio.moder.read().bits()).unwrap();
         let _ = rd.set_high().map_err(|_| DisplayError::DCError);
         let _ = cs.set_high().map_err(|_| DisplayError::DCError);
-        Self { tx, gpio, dc, wr, cs, rd }
+        Self { gpio, dc, wr, cs, rd }
     }
 
     /// Consume the display interface and return
     /// the bus and GPIO pins used by it
-    pub fn release(self) -> (TX, DC, WR, CS, RD) {
-        (self.tx, self.dc, self.wr, self.cs, self.rd)
+    pub fn release(self) -> (DC, WR, CS, RD) {
+        (self.dc, self.wr, self.cs, self.rd)
     }
 
     fn write_iter(&mut self, iter: impl Iterator<Item = u16>) -> ResultPin {
@@ -209,10 +208,9 @@ where
     }
 }
 
-impl<TX, DC, WR, CS, RD> WriteOnlyDataCommand for
-    ParallelStm32GpioIntf<TX, DC, WR, CS, RD>
+impl<DC, WR, CS, RD> WriteOnlyDataCommand for
+    ParallelStm32GpioIntf<DC, WR, CS, RD>
 where
-    TX: Write,
     DC: OutputPin,
     WR: OutputPin,
     CS: OutputPin,
@@ -277,7 +275,7 @@ fn main() -> ! {
     writeln!(tx, "ILI9325 Lcd\r").unwrap();
     let interface = ParallelStm32GpioIntf::new(
                                               &mut delay,
-                                              tx,
+                                              &mut tx,
                                               dp.GPIOB,
                                               gpioc.pc8.into_push_pull_output(),
                                               gpioc.pc7.into_push_pull_output(),
@@ -362,7 +360,9 @@ fn main() -> ! {
             1 => {
                 free(|cs| STATE.borrow(cs).replace(0));
                 led1.toggle();
-                let (_, _) =touch.get_pixel(&mut delay);
+                let (x, y) =touch.get_pixel(&mut delay);
+                writeln!(tx, "ILI9325 touch {} {}\r", x, y).unwrap();
+                free(|cs| STATE.borrow(cs).replace(0));
             },
             _ => {},
         };
