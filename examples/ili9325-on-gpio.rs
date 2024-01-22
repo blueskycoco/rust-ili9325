@@ -109,7 +109,7 @@ where
     }
 
     fn reg_r(&mut self, delay: &mut dyn DelayUs<u16>) -> u16 {
-        let mut data = 0;
+        let mut data: u16 = 0;
         for _ in 0..12 {
             data = data << 1;
             let _ = self.clk.set_high();
@@ -117,8 +117,8 @@ where
             let _ = self.clk.set_low();
             delay.delay_us(100);
             match self.dout.is_high() {
-                Ok(_) => data = data + 1,
-                _ => data = data,
+                Ok(true) => data = data + 1,
+                _ => {},
             }
         }
         data
@@ -344,25 +344,30 @@ fn main() -> ! {
     let touch_din = gpioc.pc3.into_push_pull_output();
     let touch_cs = gpioc.pc13.into_push_pull_output();
     let touch_clk = gpioc.pc0.into_push_pull_output();
-    let touch_dout = gpioc.pc2.into_pull_up_input();
+    let touch_dout = gpioc.pc2.into_pull_down_input();
     let mut touch = TouchStm32GpioIntf::new(touch_cs, touch_clk,
                                             touch_din, touch_dout);
     loop {
-/*        let _= led1.set_low();
-        led2_set(true);
-        delay.delay_ms(1000 as u16);
-        led1.set_high();
-        led2_set(false);
-        delay.delay_ms(1000 as u16);
-        */
         let state = free(|cs| STATE.borrow(cs).get());
         match state {
             1 => {
                 free(|cs| STATE.borrow(cs).replace(0));
                 led1.toggle();
-                let (x, y) =touch.get_pixel(&mut delay);
-                writeln!(tx, "ILI9325 touch {} {}\r", x, y).unwrap();
+                free(|cs| {
+                let mut touch_ref = TOUCH.borrow(cs).borrow_mut();
+                if let Some(ref mut touch_io) = touch_ref.deref_mut() {
+                loop {
+                match touch_io.is_low() {
+                    true => {
+                        let (x, y) =touch.get_pixel(&mut delay);
+                        writeln!(tx, "ILI9325 touch {} {}\r", x, y).unwrap();
+                    },
+                    _ => { break; },
+                }
+                }
                 free(|cs| STATE.borrow(cs).replace(0));
+                }
+                });
             },
             _ => {},
         };
