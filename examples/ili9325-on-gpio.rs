@@ -61,8 +61,11 @@ where
             let x = (x1 + x2) / 2;
             let y = (y1 + y2) / 2;
             if (x > 280) && (y > 340) {
-                return (240 * (x - 280) / (3800 - 280),
-                        320 * (y - 340) / (3600 - 340));
+                let mut xx = (240 * (x - 280) as u32 / (3800 - 280) as u32) as u16;
+                let mut yy = (320 * (y - 340) as u32 / (3600 - 340) as u32) as u16;
+                if xx > 240 { xx = 240; }
+                if yy > 320 { yy = 320; }
+                return (xx, yy);
             } else {
                 return (0, 0);
             }
@@ -76,16 +79,16 @@ where
         
         self.reg_w(0x90, delay);
         let _ = self.clk.set_high();
-        delay.delay_us(100);
+        delay.delay_us(1);
         let _ = self.clk.set_low();
-        delay.delay_us(100);
+        delay.delay_us(1);
         let x = self.reg_r(delay);
         
         self.reg_w(0xd0, delay);
         let _ = self.clk.set_high();
-        delay.delay_us(100);
+        delay.delay_us(1);
         let _ = self.clk.set_low();
-        delay.delay_us(100);
+        delay.delay_us(1);
         let y = self.reg_r(delay);
         
         let _ = self.cs.set_high();
@@ -101,9 +104,9 @@ where
                 let _ = self.din.set_low();
             }
             let _ = self.clk.set_low();
-            delay.delay_us(100);
+            delay.delay_us(1);
             let _ = self.clk.set_high();
-            delay.delay_us(100);
+            delay.delay_us(1);
             i_reg = i_reg << 1;
         }
     }
@@ -113,9 +116,9 @@ where
         for _ in 0..12 {
             data = data << 1;
             let _ = self.clk.set_high();
-            delay.delay_us(100);
+            delay.delay_us(1);
             let _ = self.clk.set_low();
-            delay.delay_us(100);
+            delay.delay_us(1);
             match self.dout.is_high() {
                 Ok(true) => data = data + 1,
                 _ => {},
@@ -360,7 +363,10 @@ fn main() -> ! {
                 match touch_io.is_low() {
                     true => {
                         let (x, y) =touch.get_pixel(&mut delay);
+                        if !(x == 0 && y == 0) {
                         writeln!(tx, "ILI9325 touch {} {}\r", x, y).unwrap();
+                        Pixel(Point::new(x as i32, y as i32), Rgb565::GREEN).draw(&mut ili9325).unwrap();
+                        }
                     },
                     _ => { break; },
                 }
