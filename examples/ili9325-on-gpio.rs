@@ -77,14 +77,14 @@ where
     fn touch_read(&mut self, delay: &mut dyn DelayUs<u16>) -> (u16, u16) {
         let _ = self.cs.set_low();
         
-        self.reg_w(0x90, delay);
+        self.reg_w(0xd0, delay);
         let _ = self.clk.set_high();
         delay.delay_us(1);
         let _ = self.clk.set_low();
         delay.delay_us(1);
         let x = self.reg_r(delay);
         
-        self.reg_w(0xd0, delay);
+        self.reg_w(0x90, delay);
         let _ = self.clk.set_high();
         delay.delay_us(1);
         let _ = self.clk.set_low();
