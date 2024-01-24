@@ -16,10 +16,13 @@ use cortex_m::interrupt::{free, Mutex};
 use embedded_graphics::{
     text::{Text,},
     prelude::*,
+    image::{ Image },
     pixelcolor::Rgb565,
     primitives::{Circle, PrimitiveStyleBuilder, Rectangle, Triangle},
     mono_font::{ascii::FONT_9X18_BOLD, MonoTextStyle},
 };
+
+use tinybmp::Bmp;
 use core::fmt::Write;
 use embedded_hal::blocking::delay::{DelayMs, DelayUs};
 use embedded_hal::digital::v2::{OutputPin, InputPin};
@@ -350,6 +353,26 @@ fn main() -> ! {
     let touch_dout = gpioc.pc2.into_pull_down_input();
     let mut touch = TouchStm32GpioIntf::new(touch_cs, touch_clk,
                                             touch_din, touch_dout);
+    let bmp_data = include_bytes!("logo.bmp");
+    let bmp = Bmp::from_slice(bmp_data);
+    match bmp {
+        Ok(bmp_raw) => {
+        let im: Image<Bmp<Rgb565>> = Image::new(&bmp_raw, Point::new(15, 55));
+        im.draw(&mut ili9325).unwrap();
+        },
+        Err(error) => {
+            writeln!(tx, "display logo failed {:?}", error);
+        },
+    }
+    /*match bmp {
+        Ok(bmp_raw) => {
+            let im: Image<Bmp<Rgb565>> = Image::new(&bmp_raw, Point::new(15, 55));
+            im.draw(&mut ili9325).unwrap();
+        },
+        Err(error) => {
+            writeln!(tx, "display logo failed");
+        },
+    }*/
     loop {
         let state = free(|cs| STATE.borrow(cs).get());
         match state {
@@ -364,7 +387,7 @@ fn main() -> ! {
                     true => {
                         let (x, y) =touch.get_pixel(&mut delay);
                         if !(x == 0 && y == 0) {
-                        writeln!(tx, "ILI9325 touch {} {}\r", x, y).unwrap();
+                        //writeln!(tx, "ILI9325 touch {} {}\r", x, y).unwrap();
                         Pixel(Point::new(x as i32, y as i32), Rgb565::GREEN).draw(&mut ili9325).unwrap();
                         }
                     },

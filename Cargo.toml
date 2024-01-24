@@ -40,5 +40,8 @@ path = "."
 [dev-dependencies.cortex-m-semihosting]
 version = "0.5.0"
 
+[dev-dependencies.tinybmp]
+version = "0.3.1"
+
 [[example]]
 name = "ili9325-on-gpio"
