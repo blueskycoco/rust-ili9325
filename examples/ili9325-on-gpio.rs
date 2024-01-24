@@ -343,10 +343,6 @@ fn main() -> ! {
         .draw(&mut ili9325)
         .unwrap();
         
-    Text::new("Hello Eva, I love Eva", Point::new(10, 200),
-                MonoTextStyle::new(&FONT_9X18_BOLD, Rgb565::YELLOW))
-        .draw(&mut ili9325)
-        .unwrap();
     let touch_din = gpioc.pc3.into_push_pull_output();
     let touch_cs = gpioc.pc13.into_push_pull_output();
     let touch_clk = gpioc.pc0.into_push_pull_output();
@@ -357,13 +353,17 @@ fn main() -> ! {
     let bmp = Bmp::from_slice(bmp_data);
     match bmp {
         Ok(bmp_raw) => {
-        let im: Image<Bmp<Rgb565>> = Image::new(&bmp_raw, Point::new(15, 55));
+        let im: Image<Bmp<Rgb565>> = Image::new(&bmp_raw, Point::new(0, 0));
         im.draw(&mut ili9325).unwrap();
         },
         Err(error) => {
             writeln!(tx, "display logo failed {:?}", error);
         },
     }
+    Text::new("Hello Eva, I love Eva", Point::new(10, 200),
+                MonoTextStyle::new(&FONT_9X18_BOLD, Rgb565::GREEN))
+        .draw(&mut ili9325)
+        .unwrap();
     /*match bmp {
         Ok(bmp_raw) => {
             let im: Image<Bmp<Rgb565>> = Image::new(&bmp_raw, Point::new(15, 55));

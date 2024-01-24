@@ -88,7 +88,7 @@ where
         ili9325.command(Command::DispCtl2,              &[0x0207])?;
         ili9325.command(Command::DispCtl3,              &[0x0000])?;
         ili9325.command(Command::DispCtl4,              &[0x0000])?;
-        ili9325.command(Command::RGBDispCtl1,           &[0x0000])?;
+        ili9325.command(Command::RGBDispCtl1,           &[0x0001])?;
         ili9325.command(Command::FrameMarker,           &[0x0000])?;
         ili9325.command(Command::RGBDispCtl2,           &[0x0000])?;
         delay.delay_ms(50);
