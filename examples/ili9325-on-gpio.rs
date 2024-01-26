@@ -480,18 +480,23 @@ fn main() -> ! {
     });
     let mut tx = dp.USART2.tx(gpioa.pa2, 115200.bps(), &clocks).unwrap();
     writeln!(tx, "ILI9325 Lcd\r").unwrap();
-    uart1_write(b"+++").unwrap();
-    //delay.delay_ms(100_u32);
-    let response = uart1_read().expect("Failed to read from UART1");
-    writeln!(tx, "usr read: {}\r", core::str::from_utf8(&response).unwrap()).unwrap();
-    uart1_write(b"a").unwrap();
-    //delay.delay_ms(100_u32);
-    let response = uart1_read().expect("Failed to read from UART1");
-    writeln!(tx, "usr read: {}\r", core::str::from_utf8(&response).unwrap()).unwrap();
-    //delay.delay_ms(100_u32);*/
-    uart1_write(b"AT+H\r").unwrap();
+    uart1_write(b"AT+VER\r").unwrap();
     delay.delay_ms(400_u32);
-    let response = uart1_read().expect("Failed to read from UART1");
+    let response = uart1_read().unwrap();
+    if response[0] == 0 {
+        uart1_write(b"+++").unwrap();
+        //delay.delay_ms(100_u32);
+        let response = uart1_read().unwrap();
+        writeln!(tx, "usr read: {}\r", core::str::from_utf8(&response).unwrap()).unwrap();
+        uart1_write(b"a").unwrap();
+        //delay.delay_ms(100_u32);
+        let response = uart1_read().unwrap();
+        writeln!(tx, "usr read: {}\r", core::str::from_utf8(&response).unwrap()).unwrap();
+    }
+    //delay.delay_ms(100_u32);*/
+    uart1_write(b"at+ping=192.168.1.6\r").unwrap();
+    delay.delay_ms(1000_u32);
+    let response = uart1_read().unwrap();
     writeln!(tx, "usr read: {}\r", core::str::from_utf8(&response).unwrap()).unwrap();
     let interface = ParallelStm32GpioIntf::new(
                                               &mut delay,
