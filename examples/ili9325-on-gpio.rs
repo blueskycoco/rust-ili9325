@@ -42,7 +42,7 @@ use stm32f4xx_hal::{
     serial,
 };
 
-const UART_BUFFER_SIZE: usize = 1024;
+const UART_BUFFER_SIZE: usize = 8*1024;
 
 // Simple ring buffer
 pub struct Buffer {
@@ -417,10 +417,8 @@ fn main() -> ! {
     // See CHANGELOG of unreleased main branch and issue https://github.com/japaric/heapless/pull/362 for details.
     let rx_buffer1 =
             cortex_m::singleton!(: [u8; UART_BUFFER_SIZE] = [0; UART_BUFFER_SIZE]).unwrap();
-    let _rx_buffer2 =
-            cortex_m::singleton!(: [u8; UART_BUFFER_SIZE] = [0; UART_BUFFER_SIZE]).unwrap();
-//    let bmp_buf =
-//            cortex_m::singleton!(: [u8; 80000] = [0; 80000]).unwrap();
+    //let _rx_buffer2 =
+    //        cortex_m::singleton!(: [u8; UART_BUFFER_SIZE] = [0; UART_BUFFER_SIZE]).unwrap();
 
     let (tx1, mut rx) = uart1.split();
 
@@ -584,7 +582,6 @@ fn main() -> ! {
                         if !(x == 0 && y == 0) {
                         //writeln!(tx, "ILI9325 touch {} {}\r", x, y).unwrap();
                         Pixel(Point::new(x as i32, y as i32), Rgb565::GREEN).draw(&mut ili9325).unwrap();
-                        usr_wifi232_rcv(&mut tx);
                         }
                     },
                     _ => { break; },
@@ -593,6 +590,11 @@ fn main() -> ! {
                 free(|cs| STATE.borrow(cs).replace(0));
                 }
                 });
+            },
+            2 => {
+                free(|cs| STATE.borrow(cs).replace(0));
+                led1.toggle();
+                usr_wifi232_rcv(&mut tx);
             },
             _ => {},
         };
@@ -617,28 +619,49 @@ fn usr_wifi232_cmd(tx: &mut dyn Write,
 }
 
 fn usr_wifi232_rcv(tx: &mut dyn Write) {
-   let resp = uart1_read().unwrap();
-   let str_resp = core::str::from_utf8(&resp).unwrap();
-   writeln!(tx, "{}", str_resp);
+    let resp = uart1_read().unwrap();
+    let file_len: usize = (resp[0] as usize) << 8 | resp[1] as usize;
+    writeln!(tx, "len {}\r", file_len);
+    if file_len == 0 {
+        return;
+    }
+    let mut index: usize = 2;
+    loop {
+        if (index + 1000) < file_len {
+            writeln!(tx, "send ...\r");
+            uart1_write(&resp[index..index+1000]);
+            index = index + 1000_usize;
+        } else {
+            writeln!(tx, "send end\r");
+            uart1_write(&resp[index..file_len+2]);
+            break;
+        }
+    }
+    writeln!(tx, "len1 {}\r", file_len);
 }
 
 fn usr_wifi232_t_init(tx: &mut dyn Write, delay: &mut dyn DelayMs<u16>) {
     //check mode
-    let response = usr_wifi232_cmd(tx, delay, b"at+ver\r", 400, "+ok");
+    let response = usr_wifi232_cmd(tx, delay, b"at+ver\r", 100, "+ok");
     if !response {
         //switch at cmd mode
-        usr_wifi232_cmd(tx, delay, b"+++", 400, "a");
-        usr_wifi232_cmd(tx, delay, b"a", 400, "+ok");
+        usr_wifi232_cmd(tx, delay, b"+++", 100, "a");
+        usr_wifi232_cmd(tx, delay, b"a", 100, "+ok");
     }
-    usr_wifi232_cmd(tx, delay, b"at+wann\r", 400, "+ok");
-    usr_wifi232_cmd(tx, delay, b"at+netp\r", 400, "+ok");
-    usr_wifi232_cmd(tx, delay, b"at+netp=tcp,server,1234,192.168.1.2\r", 400, "+ok");
-    usr_wifi232_cmd(tx, delay, b"at+netp\r", 400, "+ok");
-    usr_wifi232_cmd(tx, delay, b"at+ping=192.168.1.6\r", 400, "Success");
-    usr_wifi232_cmd(tx, delay, b"at+h\r", 400, "+ok");
-    usr_wifi232_cmd(tx, delay, b"at+tcpdis=on\r", 400, "+ok");
-    usr_wifi232_cmd(tx, delay, b"at+tcpdis\r", 400, "+ok");
-    usr_wifi232_cmd(tx, delay, b"at+tmode=throughput\r", 400, "+ok");
+    //usr_wifi232_cmd(tx, delay, b"at+z\r", 100, "+ok");
+    //delay.delay_ms(3000_u16);
+    //usr_wifi232_cmd(tx, delay, b"+++", 100, "a");
+    //usr_wifi232_cmd(tx, delay, b"a", 100, "+ok");
+    usr_wifi232_cmd(tx, delay, b"at+wann\r", 100, "+ok");
+    usr_wifi232_cmd(tx, delay, b"at+netp\r", 100, "+ok");
+    usr_wifi232_cmd(tx, delay, b"at+netp=tcp,server,1234,192.168.1.2\r", 100, "+ok");
+    usr_wifi232_cmd(tx, delay, b"at+netp\r", 100, "+ok");
+    usr_wifi232_cmd(tx, delay, b"at+ping=192.168.1.6\r", 100, "Success");
+    usr_wifi232_cmd(tx, delay, b"at+h\r", 100, "+ok");
+    usr_wifi232_cmd(tx, delay, b"at+tcpdis=on\r", 100, "+ok");
+    usr_wifi232_cmd(tx, delay, b"at+tcpdis\r", 100, "+ok");
+    usr_wifi232_cmd(tx, delay, b"at+z\r", 1000, "+ok");
+    //usr_wifi232_cmd(tx, delay, b"at+tmode=throughput\r", 1000, "+ok");
 }
 
 fn led2_set(high: bool) {
@@ -686,6 +709,7 @@ fn USART1() {
                             }
                             ring_buffer.push(buffer[i]);
                         }
+                        free(|cs| STATE.borrow(cs).replace(2));
                     }
                 }
             }
