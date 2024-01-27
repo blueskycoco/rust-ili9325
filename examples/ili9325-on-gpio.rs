@@ -42,7 +42,7 @@ use stm32f4xx_hal::{
     serial,
 };
 
-const UART_BUFFER_SIZE: usize = 4096;
+const UART_BUFFER_SIZE: usize = 1024;
 
 // Simple ring buffer
 pub struct Buffer {
@@ -419,6 +419,8 @@ fn main() -> ! {
             cortex_m::singleton!(: [u8; UART_BUFFER_SIZE] = [0; UART_BUFFER_SIZE]).unwrap();
     let _rx_buffer2 =
             cortex_m::singleton!(: [u8; UART_BUFFER_SIZE] = [0; UART_BUFFER_SIZE]).unwrap();
+//    let bmp_buf =
+//            cortex_m::singleton!(: [u8; 80000] = [0; 80000]).unwrap();
 
     let (tx1, mut rx) = uart1.split();
 
@@ -582,6 +584,7 @@ fn main() -> ! {
                         if !(x == 0 && y == 0) {
                         //writeln!(tx, "ILI9325 touch {} {}\r", x, y).unwrap();
                         Pixel(Point::new(x as i32, y as i32), Rgb565::GREEN).draw(&mut ili9325).unwrap();
+                        usr_wifi232_rcv(&mut tx);
                         }
                     },
                     _ => { break; },
@@ -605,12 +608,18 @@ fn usr_wifi232_cmd(tx: &mut dyn Write,
    delay.delay_ms(ts);
    let resp = uart1_read().unwrap();
    let str_resp = core::str::from_utf8(&resp).unwrap();
-   writeln!(tx, "{}\r", str_resp);
+   writeln!(tx, "{}", str_resp);
    if str_resp.contains(dest) {
        true
    } else {
        false
    }
+}
+
+fn usr_wifi232_rcv(tx: &mut dyn Write) {
+   let resp = uart1_read().unwrap();
+   let str_resp = core::str::from_utf8(&resp).unwrap();
+   writeln!(tx, "{}", str_resp);
 }
 
 fn usr_wifi232_t_init(tx: &mut dyn Write, delay: &mut dyn DelayMs<u16>) {
@@ -620,14 +629,16 @@ fn usr_wifi232_t_init(tx: &mut dyn Write, delay: &mut dyn DelayMs<u16>) {
         //switch at cmd mode
         usr_wifi232_cmd(tx, delay, b"+++", 400, "a");
         usr_wifi232_cmd(tx, delay, b"a", 400, "+ok");
-//        uart1_write(b"+++").unwrap();
-//        let response = uart1_read().unwrap();
-//        writeln!(tx, "usr read: {}\r", core::str::from_utf8(&response).unwrap()).unwrap();
-//        uart1_write(b"a").unwrap();
-//        let response = uart1_read().unwrap();
-//        writeln!(tx, "usr read: {}\r", core::str::from_utf8(&response).unwrap()).unwrap();
     }
+    usr_wifi232_cmd(tx, delay, b"at+wann\r", 400, "+ok");
+    usr_wifi232_cmd(tx, delay, b"at+netp\r", 400, "+ok");
+    usr_wifi232_cmd(tx, delay, b"at+netp=tcp,server,1234,192.168.1.2\r", 400, "+ok");
+    usr_wifi232_cmd(tx, delay, b"at+netp\r", 400, "+ok");
     usr_wifi232_cmd(tx, delay, b"at+ping=192.168.1.6\r", 400, "Success");
+    usr_wifi232_cmd(tx, delay, b"at+h\r", 400, "+ok");
+    usr_wifi232_cmd(tx, delay, b"at+tcpdis=on\r", 400, "+ok");
+    usr_wifi232_cmd(tx, delay, b"at+tcpdis\r", 400, "+ok");
+    usr_wifi232_cmd(tx, delay, b"at+tmode=throughput\r", 400, "+ok");
 }
 
 fn led2_set(high: bool) {
@@ -649,11 +660,6 @@ fn EXTI1() {
         if let Some(ref mut touch) = touch_ref.deref_mut() {
             touch.clear_interrupt_pending_bit();
             free(|cs| STATE.borrow(cs).replace(1));
-//            let mut led_ref = LED2.borrow(cs).borrow_mut();
-//            if let Some(ref mut led) = led_ref.deref_mut() {
-//                led.toggle();
-//            }
-
             }
     });
 }
