@@ -480,24 +480,6 @@ fn main() -> ! {
     });
     let mut tx = dp.USART2.tx(gpioa.pa2, 115200.bps(), &clocks).unwrap();
     writeln!(tx, "ILI9325 Lcd\r").unwrap();
-    uart1_write(b"AT+VER\r").unwrap();
-    delay.delay_ms(400_u32);
-    let response = uart1_read().unwrap();
-    if response[0] == 0 {
-        uart1_write(b"+++").unwrap();
-        //delay.delay_ms(100_u32);
-        let response = uart1_read().unwrap();
-        writeln!(tx, "usr read: {}\r", core::str::from_utf8(&response).unwrap()).unwrap();
-        uart1_write(b"a").unwrap();
-        //delay.delay_ms(100_u32);
-        let response = uart1_read().unwrap();
-        writeln!(tx, "usr read: {}\r", core::str::from_utf8(&response).unwrap()).unwrap();
-    }
-    //delay.delay_ms(100_u32);*/
-    uart1_write(b"at+ping=192.168.1.6\r").unwrap();
-    delay.delay_ms(1000_u32);
-    let response = uart1_read().unwrap();
-    writeln!(tx, "usr read: {}\r", core::str::from_utf8(&response).unwrap()).unwrap();
     let interface = ParallelStm32GpioIntf::new(
                                               &mut delay,
                                               &mut tx,
@@ -583,15 +565,7 @@ fn main() -> ! {
                 MonoTextStyle::new(&FONT_9X18_BOLD, Rgb565::GREEN))
         .draw(&mut ili9325)
         .unwrap();
-    /*match bmp {
-        Ok(bmp_raw) => {
-            let im: Image<Bmp<Rgb565>> = Image::new(&bmp_raw, Point::new(15, 55));
-            im.draw(&mut ili9325).unwrap();
-        },
-        Err(error) => {
-            writeln!(tx, "display logo failed");
-        },
-    }*/
+   usr_wifi232_t_init(&mut tx, &mut delay); 
     loop {
         let state = free(|cs| STATE.borrow(cs).get());
         match state {
@@ -620,6 +594,40 @@ fn main() -> ! {
             _ => {},
         };
     }
+}
+
+fn usr_wifi232_cmd(tx: &mut dyn Write,
+                   delay: &mut dyn DelayMs<u16>,
+                   cmd: &[u8],
+                   ts: u16,
+                   dest: &str) -> bool {
+   uart1_write(cmd).unwrap();
+   delay.delay_ms(ts);
+   let resp = uart1_read().unwrap();
+   let str_resp = core::str::from_utf8(&resp).unwrap();
+   writeln!(tx, "{}\r", str_resp);
+   if str_resp.contains(dest) {
+       true
+   } else {
+       false
+   }
+}
+
+fn usr_wifi232_t_init(tx: &mut dyn Write, delay: &mut dyn DelayMs<u16>) {
+    //check mode
+    let response = usr_wifi232_cmd(tx, delay, b"at+ver\r", 400, "+ok");
+    if !response {
+        //switch at cmd mode
+        usr_wifi232_cmd(tx, delay, b"+++", 400, "a");
+        usr_wifi232_cmd(tx, delay, b"a", 400, "+ok");
+//        uart1_write(b"+++").unwrap();
+//        let response = uart1_read().unwrap();
+//        writeln!(tx, "usr read: {}\r", core::str::from_utf8(&response).unwrap()).unwrap();
+//        uart1_write(b"a").unwrap();
+//        let response = uart1_read().unwrap();
+//        writeln!(tx, "usr read: {}\r", core::str::from_utf8(&response).unwrap()).unwrap();
+    }
+    usr_wifi232_cmd(tx, delay, b"at+ping=192.168.1.6\r", 400, "Success");
 }
 
 fn led2_set(high: bool) {
