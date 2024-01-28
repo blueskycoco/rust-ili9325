@@ -350,6 +350,7 @@ dependencies = [
  "embedded-graphics-core",
  "embedded-hal 0.2.7",
  "ili9325",
+ "md5-rs",
  "panic-semihosting",
  "stm32f4xx-hal",
  "tinybmp",
@@ -374,6 +375,12 @@ dependencies = [
  "autocfg",
  "scopeguard",
 ]
+
+[[package]]
+name = "md5-rs"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e721d76fbc416d47862475f6bfa4742bf091fb75049d183fea50f1c79459fbe1"
 
 [[package]]
 name = "memchr"

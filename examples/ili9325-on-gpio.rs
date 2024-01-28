@@ -41,6 +41,7 @@ use stm32f4xx_hal::{
     prelude::*,
     serial,
 };
+use md5_rs::Context;
 
 const UART_BUFFER_SIZE: usize = 8*1024;
 
@@ -621,7 +622,11 @@ fn usr_wifi232_cmd(tx: &mut dyn Write,
 fn usr_wifi232_rcv(tx: &mut dyn Write) {
     let resp = uart1_read().unwrap();
     let file_len: usize = (resp[0] as usize) << 8 | resp[1] as usize;
-    writeln!(tx, "len {}\r", file_len);
+    let mut ctx = Context::new();
+    ctx.read(&resp[2..file_len+2]);
+    let digest = ctx.finish();
+    //let hash = digest.iter().map(|x| format!("{:02x}", x)).collect::<String>();
+    writeln!(tx, "len {}, hash {:?}\r", file_len, digest);
     if file_len == 0 {
         return;
     }
