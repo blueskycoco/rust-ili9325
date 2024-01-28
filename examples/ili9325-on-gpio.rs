@@ -112,6 +112,9 @@ pub fn uart1_read() -> Option<[u8; UART_BUFFER_SIZE]> {
                 }
                 i += 1;
             }
+            //if buf[0] == 0 {
+            //    return None;
+            //}
             Some(buf)
         } else {
             None
@@ -605,14 +608,16 @@ fn main() -> ! {
                         let y: i32 = (bmp_raw[20] as i32) << 8 | bmp_raw[21] as i32;
                         let im: Image<Bmp<Rgb565>> = Image::new(&bmp_byte, Point::new(x, y));
                         im.draw(&mut ili9325).unwrap();
+                        uart1_write(b"send ok");
                         },
                         Err(error) => {
-                            writeln!(tx, "display logo failed {:?}", error);
+                            writeln!(tx, "display logo failed {:?}\r", error);
+                            uart1_write(b"send failed");
                         },
                     }
                     },
-                    _ => {},
-                }
+                    _ => { writeln!(tx, "bmp xfer failed"); },
+                };
             },
             _ => {},
         };
@@ -642,36 +647,36 @@ fn usr_wifi232_rcv(tx: &mut dyn Write) ->Option<[u8;UART_BUFFER_SIZE]> {
      *      | 2 byte len | 16 byte md5 | 4 byte x/y | bmp slice |
      * ofs  0            2             18           22  
      */
-    let resp = uart1_read().unwrap();
-    let file_len: usize = (resp[0] as usize) << 8 | resp[1] as usize;
-    let mut ctx = Context::new();
-    ctx.read(&resp[22..file_len+22]);
-    let digest = ctx.finish();
-    let remote_dig = &resp[2..18];
-    writeln!(tx, "len {}, hash {:?} -- {:?}\r", file_len, digest, remote_dig);
-    if file_len == 0 {
-        return None;
-    } else if digest != remote_dig {
-        uart1_write(b"send failed");
-        return None;
-    } else {
-        uart1_write(b"send ok");
-    }
-/*    let mut index: usize = 2;
-    loop {
-        if (index + 1000) < file_len {
-            writeln!(tx, "send ...\r");
-            uart1_write(&resp[index..index+1000]);
-            index = index + 1000_usize;
-        } else {
-            writeln!(tx, "send end\r");
-            uart1_write(&resp[index..file_len+2]);
-            break;
-        }
-    }
-    writeln!(tx, "len1 {}\r", file_len);*/
-    Some(resp)
-    //let bmp_data = include_bytes!("logo.bmp");
+    uart1_read()
+    /*
+    //loop {
+        let resp = uart1_read().unwrap();
+        //match resp_byte {
+           // Some(resp) => {
+                let file_len: usize = (resp[0] as usize) << 8 | resp[1] as usize;
+                if file_len == 0 {
+                    uart1_write(b"send failed 1");
+                    return None;
+                }
+                let mut ctx = Context::new();
+                ctx.read(&resp[22..file_len+22]);
+                let digest = ctx.finish();
+                let remote_dig = &resp[2..18];
+                writeln!(tx, "{:?}|{:?}\r", digest, remote_dig);
+                if digest != remote_dig {
+                    uart1_write(b"send failed 2");
+                    return None;
+                } else {
+                    uart1_write(b"send ok");
+                }
+                return Some(resp);
+           // },
+           // _ => { 
+             //   writeln!(tx, "no data\r");
+           //     return None;
+         //   },
+       // };
+    //}*/
 }
 
 fn usr_wifi232_t_init(tx: &mut dyn Write, delay: &mut dyn DelayMs<u16>) {
@@ -694,7 +699,7 @@ fn usr_wifi232_t_init(tx: &mut dyn Write, delay: &mut dyn DelayMs<u16>) {
     usr_wifi232_cmd(tx, delay, b"at+h\r", 100, "+ok");
     usr_wifi232_cmd(tx, delay, b"at+tcpdis=on\r", 100, "+ok");
     usr_wifi232_cmd(tx, delay, b"at+tcpdis\r", 100, "+ok");
-    usr_wifi232_cmd(tx, delay, b"at+z\r", 1000, "+ok");
+    usr_wifi232_cmd(tx, delay, b"at+z\r", 2000, "+ok");
     //usr_wifi232_cmd(tx, delay, b"at+tmode=throughput\r", 1000, "+ok");
 }
 
