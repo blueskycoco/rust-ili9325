@@ -595,7 +595,24 @@ fn main() -> ! {
             2 => {
                 free(|cs| STATE.borrow(cs).replace(0));
                 led1.toggle();
-                usr_wifi232_rcv(&mut tx);
+                let bmp_data = usr_wifi232_rcv(&mut tx);
+                match bmp_data {
+                    Some(bmp_raw) => {
+                    let bmp = Bmp::from_slice(&bmp_raw[22..]);
+                    match bmp {
+                        Ok(bmp_byte) => {
+                        let x: i32 = (bmp_raw[18] as i32) << 8 | bmp_raw[19] as i32;
+                        let y: i32 = (bmp_raw[20] as i32) << 8 | bmp_raw[21] as i32;
+                        let im: Image<Bmp<Rgb565>> = Image::new(&bmp_byte, Point::new(x, y));
+                        im.draw(&mut ili9325).unwrap();
+                        },
+                        Err(error) => {
+                            writeln!(tx, "display logo failed {:?}", error);
+                        },
+                    }
+                    },
+                    _ => {},
+                }
             },
             _ => {},
         };
@@ -619,18 +636,28 @@ fn usr_wifi232_cmd(tx: &mut dyn Write,
    }
 }
 
-fn usr_wifi232_rcv(tx: &mut dyn Write) {
+fn usr_wifi232_rcv(tx: &mut dyn Write) ->Option<[u8;UART_BUFFER_SIZE]> {
+    /* layout
+     *
+     *      | 2 byte len | 16 byte md5 | 4 byte x/y | bmp slice |
+     * ofs  0            2             18           22  
+     */
     let resp = uart1_read().unwrap();
     let file_len: usize = (resp[0] as usize) << 8 | resp[1] as usize;
     let mut ctx = Context::new();
-    ctx.read(&resp[2..file_len+2]);
+    ctx.read(&resp[22..file_len+22]);
     let digest = ctx.finish();
-    //let hash = digest.iter().map(|x| format!("{:02x}", x)).collect::<String>();
-    writeln!(tx, "len {}, hash {:?}\r", file_len, digest);
+    let remote_dig = &resp[2..18];
+    writeln!(tx, "len {}, hash {:?} -- {:?}\r", file_len, digest, remote_dig);
     if file_len == 0 {
-        return;
+        return None;
+    } else if digest != remote_dig {
+        uart1_write(b"send failed");
+        return None;
+    } else {
+        uart1_write(b"send ok");
     }
-    let mut index: usize = 2;
+/*    let mut index: usize = 2;
     loop {
         if (index + 1000) < file_len {
             writeln!(tx, "send ...\r");
@@ -642,7 +669,9 @@ fn usr_wifi232_rcv(tx: &mut dyn Write) {
             break;
         }
     }
-    writeln!(tx, "len1 {}\r", file_len);
+    writeln!(tx, "len1 {}\r", file_len);*/
+    Some(resp)
+    //let bmp_data = include_bytes!("logo.bmp");
 }
 
 fn usr_wifi232_t_init(tx: &mut dyn Write, delay: &mut dyn DelayMs<u16>) {
