@@ -601,22 +601,26 @@ fn main() -> ! {
                 let bmp_data = usr_wifi232_rcv(&mut tx);
                 match bmp_data {
                     Some(bmp_raw) => {
+                    let x: i32 = (bmp_raw[18] as i32) << 8 | bmp_raw[19] as i32;
+                    let y: i32 = (bmp_raw[20] as i32) << 8 | bmp_raw[21] as i32;
                     let bmp = Bmp::from_slice(&bmp_raw[22..]);
                     match bmp {
                         Ok(bmp_byte) => {
-                        let x: i32 = (bmp_raw[18] as i32) << 8 | bmp_raw[19] as i32;
-                        let y: i32 = (bmp_raw[20] as i32) << 8 | bmp_raw[21] as i32;
                         let im: Image<Bmp<Rgb565>> = Image::new(&bmp_byte, Point::new(x, y));
                         im.draw(&mut ili9325).unwrap();
+                        writeln!(tx, "display logo ok {:?}\r", (x, y));
                         uart1_write(b"send ok");
                         },
                         Err(error) => {
-                            writeln!(tx, "display logo failed {:?}\r", error);
+                            writeln!(tx, "display logo failed {:?} {:?}\r", (x, y), error);
                             uart1_write(b"send failed");
                         },
                     }
                     },
-                    _ => { writeln!(tx, "bmp xfer failed"); },
+                    _ => {
+                        uart1_write(b"send failed");
+                        writeln!(tx, "bmp xfer failed");
+                    },
                 };
             },
             _ => {},
@@ -647,36 +651,39 @@ fn usr_wifi232_rcv(tx: &mut dyn Write) ->Option<[u8;UART_BUFFER_SIZE]> {
      *      | 2 byte len | 16 byte md5 | 4 byte x/y | bmp slice |
      * ofs  0            2             18           22  
      */
-    uart1_read()
-    /*
-    //loop {
-        let resp = uart1_read().unwrap();
-        //match resp_byte {
-           // Some(resp) => {
-                let file_len: usize = (resp[0] as usize) << 8 | resp[1] as usize;
-                if file_len == 0 {
-                    uart1_write(b"send failed 1");
+    
+    let resp_byte = uart1_read();
+    match resp_byte {
+        Some(resp) => {
+            let file_len: usize = (resp[0] as usize) << 8 | resp[1] as usize;
+                if file_len != 7818 {
+                    uart1_write(b"send failed");
+                    writeln!(tx, "len is incorrect\r");
+                    return None;
+                }
+                let x: i32 = (resp[18] as i32) << 8 | resp[19] as i32;
+                let y: i32 = (resp[20] as i32) << 8 | resp[21] as i32;
+                if x > 240 || y > 320 {
+                    uart1_write(b"send failed");
+                    writeln!(tx, "point is incorrect\r");
                     return None;
                 }
                 let mut ctx = Context::new();
                 ctx.read(&resp[22..file_len+22]);
                 let digest = ctx.finish();
                 let remote_dig = &resp[2..18];
-                writeln!(tx, "{:?}|{:?}\r", digest, remote_dig);
+                writeln!(tx, "{:?}\r\n{:?}\r", digest, remote_dig);
                 if digest != remote_dig {
-                    uart1_write(b"send failed 2");
+                    uart1_write(b"send failed");
+                    writeln!(tx, "md5 is missmatch\r");
                     return None;
                 } else {
-                    uart1_write(b"send ok");
+                    writeln!(tx, "md5 is ok\r");
+                    return Some(resp);
                 }
-                return Some(resp);
-           // },
-           // _ => { 
-             //   writeln!(tx, "no data\r");
-           //     return None;
-         //   },
-       // };
-    //}*/
+        },
+        _ => { return None },
+    }
 }
 
 fn usr_wifi232_t_init(tx: &mut dyn Write, delay: &mut dyn DelayMs<u16>) {
