@@ -4,35 +4,36 @@
 use cortex_m_rt::entry;
 use panic_semihosting as _;
 
-use ili9325::{Ili9325};
-pub use ili9325::{DisplaySize240x320, DisplaySize320x240};
-use stm32f4xx_hal::pac::{CorePeripherals, Peripherals, GPIOB, NVIC};
-use stm32f4xx_hal::interrupt;
-use stm32f4xx_hal::gpio::{Edge, Input, Output, PC1, PA12};
-use stm32f4xx_hal::prelude::*;
 use core::cell::{Cell, RefCell};
 use core::ops::DerefMut;
 use cortex_m::interrupt::{free, Mutex};
 use embedded_graphics::{
-    text::{Text,},
-    prelude::*,
-    image::{ Image },
-    pixelcolor::Rgb565,
-    primitives::{Circle, PrimitiveStyleBuilder, Rectangle, Triangle},
+    image::Image,
     mono_font::{ascii::FONT_9X18_BOLD, MonoTextStyle},
+    pixelcolor::Rgb565,
+    prelude::*,
+    primitives::{Circle, PrimitiveStyleBuilder, Rectangle, Triangle},
+    text::Text,
 };
+use ili9325::Ili9325;
+pub use ili9325::{DisplaySize240x320, DisplaySize320x240};
+use stm32f4xx_hal::gpio::{Edge, Input, Output, PA12, PC1};
+use stm32f4xx_hal::interrupt;
+use stm32f4xx_hal::pac::{CorePeripherals, Peripherals, GPIOB, NVIC};
+use stm32f4xx_hal::prelude::*;
 
-use tinybmp::Bmp;
 use core::fmt::Write;
-use embedded_hal::blocking::delay::{DelayMs, DelayUs};
-use embedded_hal::digital::v2::{OutputPin, InputPin};
 pub use display_interface::{DataFormat, DisplayError, WriteOnlyDataCommand};
+use embedded_hal::blocking::delay::{DelayMs, DelayUs};
+use embedded_hal::digital::v2::{InputPin, OutputPin};
+use tinybmp::Bmp;
 
 /* for usart1/dma2 */
-use stm32f4xx_hal::dma::{DmaFlag, PeripheralToMemory, Stream2};
+use md5_rs::Context;
 use stm32f4xx_hal::dma::config::DmaConfig;
-use stm32f4xx_hal::pac::{DMA2};
+use stm32f4xx_hal::dma::{DmaFlag, PeripheralToMemory, Stream2};
 use stm32f4xx_hal::pac::Interrupt;
+use stm32f4xx_hal::pac::DMA2;
 use stm32f4xx_hal::uart::config::StopBits;
 use stm32f4xx_hal::uart::{Config, Rx, Serial};
 use stm32f4xx_hal::{
@@ -41,9 +42,8 @@ use stm32f4xx_hal::{
     prelude::*,
     serial,
 };
-use md5_rs::Context;
 
-const UART_BUFFER_SIZE: usize = 8*1024;
+const UART_BUFFER_SIZE: usize = 8 * 1024;
 
 // Simple ring buffer
 pub struct Buffer {
@@ -197,7 +197,7 @@ where
         let _ = din.set_high();
         let _ = clk.set_high();
         let _ = cs.set_low();
-        Self { cs, clk, din, dout}
+        Self { cs, clk, din, dout }
     }
 
     pub fn release(self) -> (CS, CLK, DIN, DOUT) {
@@ -213,8 +213,12 @@ where
             if (x > 280) && (y > 340) {
                 let mut xx = (240 * (x - 280) as u32 / (3800 - 280) as u32) as u16;
                 let mut yy = (320 * (y - 340) as u32 / (3600 - 340) as u32) as u16;
-                if xx > 240 { xx = 240; }
-                if yy > 320 { yy = 320; }
+                if xx > 240 {
+                    xx = 240;
+                }
+                if yy > 320 {
+                    yy = 320;
+                }
                 return (xx, yy);
             } else {
                 return (0, 0);
@@ -226,21 +230,21 @@ where
 
     fn touch_read(&mut self, delay: &mut dyn DelayUs<u16>) -> (u16, u16) {
         let _ = self.cs.set_low();
-        
+
         self.reg_w(0xd0, delay);
         let _ = self.clk.set_high();
         delay.delay_us(1);
         let _ = self.clk.set_low();
         delay.delay_us(1);
         let x = self.reg_r(delay);
-        
+
         self.reg_w(0x90, delay);
         let _ = self.clk.set_high();
         delay.delay_us(1);
         let _ = self.clk.set_low();
         delay.delay_us(1);
         let y = self.reg_r(delay);
-        
+
         let _ = self.cs.set_high();
         (x, y)
     }
@@ -271,12 +275,11 @@ where
             delay.delay_us(1);
             match self.dout.is_high() {
                 Ok(true) => data = data + 1,
-                _ => {},
+                _ => {}
             }
         }
         data
     }
-
 }
 
 pub struct ParallelStm32GpioIntf<DC, WR, CS, RD> {
@@ -295,8 +298,15 @@ where
     RD: OutputPin,
 {
     /// Create new parallel GPIO interface for communication with a display driver
-    pub fn new(delay: &mut dyn DelayMs<u16>, tx: &mut dyn Write, gpio: GPIOB,
-               mut dc: DC, mut wr: WR, mut cs: CS, mut rd: RD) -> Self {
+    pub fn new(
+        delay: &mut dyn DelayMs<u16>,
+        tx: &mut dyn Write,
+        gpio: GPIOB,
+        mut dc: DC,
+        mut wr: WR,
+        mut cs: CS,
+        mut rd: RD,
+    ) -> Self {
         // config gpiob pushpull output, high speed.
         //writeln!(tx, "in ParallelStm32GpioIntf\r\n").unwrap();
         let _ = gpio.moder.write(|w| unsafe { w.bits(0x55555555) });
@@ -308,10 +318,10 @@ where
         let _ = dc.set_low().map_err(|_| DisplayError::DCError);
         let _ = rd.set_high().map_err(|_| DisplayError::DCError);
         let _ = wr.set_low().map_err(|_| DisplayError::BusWriteError);
-        let _ = gpio.odr.write(|w| unsafe { w.bits(0x00 as u32) } );
+        let _ = gpio.odr.write(|w| unsafe { w.bits(0x00 as u32) });
         let _ = wr.set_high().map_err(|_| DisplayError::BusWriteError);
         let _ = cs.set_high().map_err(|_| DisplayError::DCError);
-        
+
         let _ = gpio.moder.write(|w| unsafe { w.bits(0x00 as u32) });
         //writeln!(tx, "moder: {:#x}\r", gpio.moder.read().bits()).unwrap();
         let _ = cs.set_low().map_err(|_| DisplayError::DCError);
@@ -324,7 +334,13 @@ where
         //writeln!(tx, "moder: {:#x}\r", gpio.moder.read().bits()).unwrap();
         let _ = rd.set_high().map_err(|_| DisplayError::DCError);
         let _ = cs.set_high().map_err(|_| DisplayError::DCError);
-        Self { gpio, dc, wr, cs, rd }
+        Self {
+            gpio,
+            dc,
+            wr,
+            cs,
+            rd,
+        }
     }
 
     /// Consume the display interface and return
@@ -337,9 +353,12 @@ where
         for value in iter {
             let _ = self.cs.set_low().map_err(|_| DisplayError::DCError);
             let _ = self.wr.set_low().map_err(|_| DisplayError::BusWriteError)?;
-            let _ = self.gpio.odr.write(|w| unsafe { w.bits(value as u32) } );
+            let _ = self.gpio.odr.write(|w| unsafe { w.bits(value as u32) });
             //writeln!(self.tx, "tx: {:#x}\r", value).unwrap();
-            let _ = self.wr.set_high().map_err(|_| DisplayError::BusWriteError)?;
+            let _ = self
+                .wr
+                .set_high()
+                .map_err(|_| DisplayError::BusWriteError)?;
             let _ = self.cs.set_high().map_err(|_| DisplayError::DCError);
         }
 
@@ -348,8 +367,7 @@ where
 
     fn write_data(&mut self, data: DataFormat<'_>) -> ResultPin {
         match data {
-            DataFormat::U8(slice) => self.write_iter(slice.iter().copied()
-                                                     .map(u16::from)),
+            DataFormat::U8(slice) => self.write_iter(slice.iter().copied().map(u16::from)),
             DataFormat::U8Iter(iter) => self.write_iter(iter.map(u16::from)),
             DataFormat::U16(slice) => self.write_iter(slice.iter().copied()),
             DataFormat::U16BE(slice) => self.write_iter(slice.iter().copied()),
@@ -361,8 +379,7 @@ where
     }
 }
 
-impl<DC, WR, CS, RD> WriteOnlyDataCommand for
-    ParallelStm32GpioIntf<DC, WR, CS, RD>
+impl<DC, WR, CS, RD> WriteOnlyDataCommand for ParallelStm32GpioIntf<DC, WR, CS, RD>
 where
     DC: OutputPin,
     WR: OutputPin,
@@ -391,11 +408,12 @@ fn main() -> ! {
     dp.RCC.ahb1enr.write(|w| w.gpioben().enabled());
     let rcc = dp.RCC.constrain();
     // Make HCLK faster to allow updating the display more quickly
-    let clocks = rcc.cfgr                                                                     
-        .hclk(180.MHz())                                                         
-        .sysclk(180.MHz())                                                       
-        .pclk1(45.MHz())                                                         
-        .pclk2(90.MHz())                                                         
+    let clocks = rcc
+        .cfgr
+        .hclk(180.MHz())
+        .sysclk(180.MHz())
+        .pclk1(45.MHz())
+        .pclk2(90.MHz())
         .freeze();
     let mut syscfg = dp.SYSCFG.constrain();
 
@@ -406,21 +424,21 @@ fn main() -> ! {
     let rx_1 = gpioa.pa10.into_alternate();
     let tx_1 = gpioa.pa9.into_alternate();
     let uart1 = Serial::new(
-         dp.USART1,
-         (tx_1, rx_1),
-         Config::default()
-             .baudrate(115200.bps())
-             .parity_none()
-             .stopbits(StopBits::STOP1)
-             .dma(serial::config::DmaConfig::Rx),
-         &clocks,
+        dp.USART1,
+        (tx_1, rx_1),
+        Config::default()
+            .baudrate(115200.bps())
+            .parity_none()
+            .stopbits(StopBits::STOP1)
+            .dma(serial::config::DmaConfig::Rx),
+        &clocks,
     )
     .unwrap();
 
     // Note! It is better to use memory pools, such as heapless::pool::Pool. But it not work with embedded_dma yet.
     // See CHANGELOG of unreleased main branch and issue https://github.com/japaric/heapless/pull/362 for details.
     let rx_buffer1 =
-            cortex_m::singleton!(: [u8; UART_BUFFER_SIZE] = [0; UART_BUFFER_SIZE]).unwrap();
+        cortex_m::singleton!(: [u8; UART_BUFFER_SIZE] = [0; UART_BUFFER_SIZE]).unwrap();
     //let _rx_buffer2 =
     //        cortex_m::singleton!(: [u8; UART_BUFFER_SIZE] = [0; UART_BUFFER_SIZE]).unwrap();
 
@@ -431,20 +449,20 @@ fn main() -> ! {
     free(|cs| *G_UART1_TX.borrow(cs).borrow_mut() = Some(tx1));
 
     free(|cs| {
-            *G_UART1_BUFFER.borrow(cs).borrow_mut() = Some(Buffer::new());
+        *G_UART1_BUFFER.borrow(cs).borrow_mut() = Some(Buffer::new());
     });
     // Initialize and start DMA stream
     let mut rx_transfer = Transfer::init_peripheral_to_memory(
-            dma2.2,
-            rx,
-            rx_buffer1,
-            None,
-            DmaConfig::default()
-                .memory_increment(true)
-                .fifo_enable(true)
-                .fifo_error_interrupt(true)
-                .transfer_complete_interrupt(true),
-        );
+        dma2.2,
+        rx,
+        rx_buffer1,
+        None,
+        DmaConfig::default()
+            .memory_increment(true)
+            .fifo_enable(true)
+            .fifo_error_interrupt(true)
+            .transfer_complete_interrupt(true),
+    );
 
     rx_transfer.start(|_rx| {});
 
@@ -452,11 +470,11 @@ fn main() -> ! {
 
     // Enable interrupt
     unsafe {
-            cortex_m::peripheral::NVIC::unmask(Interrupt::USART1);
-            cortex_m::peripheral::NVIC::unmask(pac::Interrupt::DMA2_STREAM2);
+        cortex_m::peripheral::NVIC::unmask(Interrupt::USART1);
+        cortex_m::peripheral::NVIC::unmask(pac::Interrupt::DMA2_STREAM2);
     }
     /* for usart1/dma2 */
-    
+
     // Create a button input with an interrupt
     let gpioc = dp.GPIOC.split();
     let mut touch_int = gpioc.pc1.into_pull_up_input();
@@ -466,13 +484,13 @@ fn main() -> ! {
     let btn_int_num = touch_int.interrupt(); // hal::pac::Interrupt::EXTI15_10
 
     free(|cs| {
-         TOUCH.borrow(cs).replace(Some(touch_int));
+        TOUCH.borrow(cs).replace(Some(touch_int));
     });
 
     // Enable interrupts
     NVIC::unpend(btn_int_num);
     unsafe {
-         NVIC::unmask(btn_int_num);
+        NVIC::unmask(btn_int_num);
     };
     let mut delay = cp.SYST.delay(&clocks);
     //let gpioc = dp.GPIOC.split();
@@ -485,20 +503,16 @@ fn main() -> ! {
     let mut tx = dp.USART2.tx(gpioa.pa2, 115200.bps(), &clocks).unwrap();
     writeln!(tx, "ILI9325 Lcd\r").unwrap();
     let interface = ParallelStm32GpioIntf::new(
-                                              &mut delay,
-                                              &mut tx,
-                                              dp.GPIOB,
-                                              gpioc.pc8.into_push_pull_output(),
-                                              gpioc.pc7.into_push_pull_output(),
-                                              gpioc.pc9.into_push_pull_output(),
-                                              gpioc.pc6.into_push_pull_output()
-                                            );
+        &mut delay,
+        &mut tx,
+        dp.GPIOB,
+        gpioc.pc8.into_push_pull_output(),
+        gpioc.pc7.into_push_pull_output(),
+        gpioc.pc9.into_push_pull_output(),
+        gpioc.pc6.into_push_pull_output(),
+    );
 
-    let mut ili9325 = Ili9325::new(
-                                    interface,
-                                    &mut delay,
-                                    DisplaySize240x320
-                                ).unwrap();
+    let mut ili9325 = Ili9325::new(interface, &mut delay, DisplaySize240x320).unwrap();
     let _ = ili9325.clear(Rgb565::BLACK);
     let yoffset = 24;
     let x_max = (ili9325.width() as i32) - 1;
@@ -536,8 +550,7 @@ fn main() -> ! {
     .unwrap();
 
     // square
-    Rectangle::with_corners(Point::new(54, yoffset), Point::new(54 + 16,
-                                                                16 + yoffset))
+    Rectangle::with_corners(Point::new(54, yoffset), Point::new(54 + 16, 16 + yoffset))
         .into_styled(green_style)
         .draw(&mut ili9325)
         .unwrap();
@@ -547,29 +560,31 @@ fn main() -> ! {
         .into_styled(blue_style)
         .draw(&mut ili9325)
         .unwrap();
-        
+
     let touch_din = gpioc.pc3.into_push_pull_output();
     let touch_cs = gpioc.pc13.into_push_pull_output();
     let touch_clk = gpioc.pc0.into_push_pull_output();
     let touch_dout = gpioc.pc2.into_pull_down_input();
-    let mut touch = TouchStm32GpioIntf::new(touch_cs, touch_clk,
-                                            touch_din, touch_dout);
+    let mut touch = TouchStm32GpioIntf::new(touch_cs, touch_clk, touch_din, touch_dout);
     let bmp_data = include_bytes!("logo.bmp");
     let bmp = Bmp::from_slice(bmp_data);
     match bmp {
         Ok(bmp_raw) => {
-        let im: Image<Bmp<Rgb565>> = Image::new(&bmp_raw, Point::new(0, 0));
-        im.draw(&mut ili9325).unwrap();
-        },
+            let im: Image<Bmp<Rgb565>> = Image::new(&bmp_raw, Point::new(0, 0));
+            im.draw(&mut ili9325).unwrap();
+        }
         Err(error) => {
             writeln!(tx, "display logo failed {:?}", error);
-        },
+        }
     }
-    Text::new("Hello Eva, I love Eva", Point::new(10, 200),
-                MonoTextStyle::new(&FONT_9X18_BOLD, Rgb565::GREEN))
-        .draw(&mut ili9325)
-        .unwrap();
-   usr_wifi232_t_init(&mut tx, &mut delay); 
+    Text::new(
+        "Hello Eva, I love Eva",
+        Point::new(10, 200),
+        MonoTextStyle::new(&FONT_9X18_BOLD, Rgb565::GREEN),
+    )
+    .draw(&mut ili9325)
+    .unwrap();
+    usr_wifi232_t_init(&mut tx, &mut delay);
     loop {
         let state = free(|cs| STATE.borrow(cs).get());
         match state {
@@ -577,112 +592,119 @@ fn main() -> ! {
                 free(|cs| STATE.borrow(cs).replace(0));
                 led1.toggle();
                 free(|cs| {
-                let mut touch_ref = TOUCH.borrow(cs).borrow_mut();
-                if let Some(ref mut touch_io) = touch_ref.deref_mut() {
-                loop {
-                match touch_io.is_low() {
-                    true => {
-                        let (x, y) =touch.get_pixel(&mut delay);
-                        if !(x == 0 && y == 0) {
-                        //writeln!(tx, "ILI9325 touch {} {}\r", x, y).unwrap();
-                        Pixel(Point::new(x as i32, y as i32), Rgb565::GREEN).draw(&mut ili9325).unwrap();
+                    let mut touch_ref = TOUCH.borrow(cs).borrow_mut();
+                    if let Some(ref mut touch_io) = touch_ref.deref_mut() {
+                        loop {
+                            match touch_io.is_low() {
+                                true => {
+                                    let (x, y) = touch.get_pixel(&mut delay);
+                                    if !(x == 0 && y == 0) {
+                                        //writeln!(tx, "ILI9325 touch {} {}\r", x, y).unwrap();
+                                        Pixel(Point::new(x as i32, y as i32), Rgb565::GREEN)
+                                            .draw(&mut ili9325)
+                                            .unwrap();
+                                    }
+                                }
+                                _ => {
+                                    break;
+                                }
+                            }
                         }
-                    },
-                    _ => { break; },
-                }
-                }
-                free(|cs| STATE.borrow(cs).replace(0));
-                }
+                        free(|cs| STATE.borrow(cs).replace(0));
+                    }
                 });
-            },
+            }
             2 => {
                 free(|cs| STATE.borrow(cs).replace(0));
                 led1.toggle();
                 let bmp_data = usr_wifi232_rcv(&mut tx);
                 match bmp_data {
                     Some(bmp_raw) => {
-                    let x: i32 = (bmp_raw[18] as i32) << 8 | bmp_raw[19] as i32;
-                    let y: i32 = (bmp_raw[20] as i32) << 8 | bmp_raw[21] as i32;
-                    let bmp = Bmp::from_slice(&bmp_raw[22..]);
-                    match bmp {
-                        Ok(bmp_byte) => {
-                        let im: Image<Bmp<Rgb565>> = Image::new(&bmp_byte, Point::new(x, y));
-                        im.draw(&mut ili9325).unwrap();
-                        writeln!(tx, "display logo ok {:?}\r", (x, y));
-                        uart1_write(b"send ok");
-                        },
-                        Err(error) => {
-                            writeln!(tx, "display logo failed {:?} {:?}\r", (x, y), error);
-                            uart1_write(b"send failed");
-                        },
+                        let x: i32 = (bmp_raw[18] as i32) << 8 | bmp_raw[19] as i32;
+                        let y: i32 = (bmp_raw[20] as i32) << 8 | bmp_raw[21] as i32;
+                        let bmp = Bmp::from_slice(&bmp_raw[22..]);
+                        match bmp {
+                            Ok(bmp_byte) => {
+                                let im: Image<Bmp<Rgb565>> =
+                                    Image::new(&bmp_byte, Point::new(x, y));
+                                im.draw(&mut ili9325).unwrap();
+                                writeln!(tx, "display logo ok {:?}\r", (x, y));
+                                uart1_write(b"send ok");
+                            }
+                            Err(error) => {
+                                writeln!(tx, "display logo failed {:?} {:?}\r", (x, y), error);
+                                uart1_write(b"send failed");
+                            }
+                        }
                     }
-                    },
                     _ => {
                         uart1_write(b"send failed");
                         writeln!(tx, "bmp xfer failed");
-                    },
+                    }
                 };
-            },
-            _ => {},
+            }
+            _ => {}
         };
     }
 }
 
-fn usr_wifi232_cmd(tx: &mut dyn Write,
-                   delay: &mut dyn DelayMs<u16>,
-                   cmd: &[u8],
-                   ts: u16,
-                   dest: &str) -> bool {
-   uart1_write(cmd).unwrap();
-   delay.delay_ms(ts);
-   let resp = uart1_read().unwrap();
-   let str_resp = core::str::from_utf8(&resp).unwrap();
-   writeln!(tx, "{}", str_resp);
-   if str_resp.contains(dest) {
-       true
-   } else {
-       false
-   }
+fn usr_wifi232_cmd(
+    tx: &mut dyn Write,
+    delay: &mut dyn DelayMs<u16>,
+    cmd: &[u8],
+    ts: u16,
+    dest: &str,
+) -> bool {
+    uart1_write(cmd).unwrap();
+    delay.delay_ms(ts);
+    let resp = uart1_read().unwrap();
+    let str_resp = core::str::from_utf8(&resp).unwrap();
+    writeln!(tx, "{}", str_resp);
+    if str_resp.contains(dest) {
+        true
+    } else {
+        false
+    }
 }
 
-fn usr_wifi232_rcv(tx: &mut dyn Write) ->Option<[u8;UART_BUFFER_SIZE]> {
+fn usr_wifi232_rcv(tx: &mut dyn Write) -> Option<[u8; UART_BUFFER_SIZE]> {
     /* layout
      *
      *      | 2 byte len | 16 byte md5 | 4 byte x/y | bmp slice |
-     * ofs  0            2             18           22  
+     * ofs  0            2             18           22
      */
-    
+
     let resp_byte = uart1_read();
     match resp_byte {
         Some(resp) => {
             let file_len: usize = (resp[0] as usize) << 8 | resp[1] as usize;
-                if file_len != 7818 {
-                    uart1_write(b"send failed");
-                    writeln!(tx, "len is incorrect\r");
-                    return None;
-                }
-                let x: i32 = (resp[18] as i32) << 8 | resp[19] as i32;
-                let y: i32 = (resp[20] as i32) << 8 | resp[21] as i32;
-                if x > 240 || y > 320 {
-                    uart1_write(b"send failed");
-                    writeln!(tx, "point is incorrect\r");
-                    return None;
-                }
-                let mut ctx = Context::new();
-                ctx.read(&resp[22..file_len+22]);
-                let digest = ctx.finish();
-                let remote_dig = &resp[2..18];
-                writeln!(tx, "{:?}\r\n{:?}\r", digest, remote_dig);
-                if digest != remote_dig {
-                    uart1_write(b"send failed");
-                    writeln!(tx, "md5 is missmatch\r");
-                    return None;
-                } else {
-                    writeln!(tx, "md5 is ok\r");
-                    return Some(resp);
-                }
-        },
-        _ => { return None },
+            if file_len != 7818 {
+                uart1_write(b"send failed");
+                writeln!(tx, "len is incorrect\r");
+                return None;
+            }
+            let x: i32 = (resp[18] as i32) << 8 | resp[19] as i32;
+            let y: i32 = (resp[20] as i32) << 8 | resp[21] as i32;
+            if x > 240 || y > 320 {
+                uart1_write(b"send failed");
+                writeln!(tx, "point is incorrect\r");
+                return None;
+            }
+            let mut ctx = Context::new();
+            ctx.read(&resp[22..file_len + 22]);
+            let digest = ctx.finish();
+            let remote_dig = &resp[2..18];
+            writeln!(tx, "{:?}\r\n{:?}\r", digest, remote_dig);
+            if digest != remote_dig {
+                uart1_write(b"send failed");
+                writeln!(tx, "md5 is missmatch\r");
+                return None;
+            } else {
+                writeln!(tx, "md5 is ok\r");
+                return Some(resp);
+            }
+        }
+        _ => return None,
     }
 }
 
@@ -700,7 +722,13 @@ fn usr_wifi232_t_init(tx: &mut dyn Write, delay: &mut dyn DelayMs<u16>) {
     //usr_wifi232_cmd(tx, delay, b"a", 100, "+ok");
     usr_wifi232_cmd(tx, delay, b"at+wann\r", 100, "+ok");
     usr_wifi232_cmd(tx, delay, b"at+netp\r", 100, "+ok");
-    usr_wifi232_cmd(tx, delay, b"at+netp=tcp,server,1234,192.168.1.2\r", 100, "+ok");
+    usr_wifi232_cmd(
+        tx,
+        delay,
+        b"at+netp=tcp,server,1234,192.168.1.2\r",
+        100,
+        "+ok",
+    );
     usr_wifi232_cmd(tx, delay, b"at+netp\r", 100, "+ok");
     usr_wifi232_cmd(tx, delay, b"at+ping=192.168.1.6\r", 100, "Success");
     usr_wifi232_cmd(tx, delay, b"at+h\r", 100, "+ok");
@@ -712,13 +740,13 @@ fn usr_wifi232_t_init(tx: &mut dyn Write, delay: &mut dyn DelayMs<u16>) {
 
 fn led2_set(high: bool) {
     free(|cs| {
-    let mut led_ref = LED2.borrow(cs).borrow_mut();
-    if let Some(ref mut led) = led_ref.deref_mut() {
-        match high {
-            true => led.set_high(),
-            _ => led.set_low(),
+        let mut led_ref = LED2.borrow(cs).borrow_mut();
+        if let Some(ref mut led) = led_ref.deref_mut() {
+            match high {
+                true => led.set_high(),
+                _ => led.set_low(),
+            }
         }
-    }
     });
 }
 
@@ -729,7 +757,7 @@ fn EXTI1() {
         if let Some(ref mut touch) = touch_ref.deref_mut() {
             touch.clear_interrupt_pending_bit();
             free(|cs| STATE.borrow(cs).replace(1));
-            }
+        }
     });
 }
 
@@ -739,7 +767,7 @@ fn USART1() {
     free(|cs| {
         if let Some(transfer) = G_TRANSFER.borrow(cs).borrow_mut().as_mut() {
             if transfer.is_idle() {
-            let mut led_ref = LED2.borrow(cs).borrow_mut();
+                let mut led_ref = LED2.borrow(cs).borrow_mut();
                 // Calc received bytes count
                 let bytes_count = UART_BUFFER_SIZE - transfer.number_of_transfers() as usize;
                 unsafe {
@@ -768,10 +796,10 @@ fn USART1() {
 #[allow(non_snake_case)]
 fn DMA2_STREAM2() {
     free(|cs| {
-            let mut led_ref = LED2.borrow(cs).borrow_mut();
-            if let Some(ref mut led) = led_ref.deref_mut() {
-                led.toggle();
-            }
+        let mut led_ref = LED2.borrow(cs).borrow_mut();
+        if let Some(ref mut led) = led_ref.deref_mut() {
+            led.toggle();
+        }
         if let Some(transfer) = G_TRANSFER.borrow(cs).borrow_mut().as_mut() {
             // Its important to clear fifo errors as the transfer is paused until it is cleared
             transfer.clear_flags(DmaFlag::FifoError | DmaFlag::TransferComplete);

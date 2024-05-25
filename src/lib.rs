@@ -81,52 +81,52 @@ where
             height: SIZE::HEIGHT,
         };
 
-        ili9325.command(Command::DriverOutputCtl,       &[0x0100])?;
-        ili9325.command(Command::LcdDrvCtl,             &[0x0700])?;
-        ili9325.command(Command::EntryMode,             &[0x1030])?;
-        ili9325.command(Command::ResizeCtl,             &[0x0000])?;
-        ili9325.command(Command::DispCtl2,              &[0x0207])?;
-        ili9325.command(Command::DispCtl3,              &[0x0000])?;
-        ili9325.command(Command::DispCtl4,              &[0x0000])?;
-        ili9325.command(Command::RGBDispCtl1,           &[0x0001])?;
-        ili9325.command(Command::FrameMarker,           &[0x0000])?;
-        ili9325.command(Command::RGBDispCtl2,           &[0x0000])?;
+        ili9325.command(Command::DriverOutputCtl, &[0x0100])?;
+        ili9325.command(Command::LcdDrvCtl, &[0x0700])?;
+        ili9325.command(Command::EntryMode, &[0x1030])?;
+        ili9325.command(Command::ResizeCtl, &[0x0000])?;
+        ili9325.command(Command::DispCtl2, &[0x0207])?;
+        ili9325.command(Command::DispCtl3, &[0x0000])?;
+        ili9325.command(Command::DispCtl4, &[0x0000])?;
+        ili9325.command(Command::RGBDispCtl1, &[0x0001])?;
+        ili9325.command(Command::FrameMarker, &[0x0000])?;
+        ili9325.command(Command::RGBDispCtl2, &[0x0000])?;
         delay.delay_ms(50);
-        ili9325.command(Command::DispCtl1,              &[0x0101])?;
+        ili9325.command(Command::DispCtl1, &[0x0101])?;
         delay.delay_ms(50);
-        ili9325.command(Command::PwrCtl1,               &[0x16b0])?;
-        ili9325.command(Command::PwrCtl2,               &[0x0001])?;
-        ili9325.command(Command::Reg17,                 &[0x0001])?;
-        ili9325.command(Command::PwrCtl3,               &[0x0138])?;
-        ili9325.command(Command::PwrCtl4,               &[0x0800])?;
-        ili9325.command(Command::PwrCtl7,               &[0x0009])?;
-        ili9325.command(Command::PwrCtl8,               &[0x0009])?;
-        ili9325.command(Command::Rega4,                 &[0x0000])?;
-        ili9325.command(Command::HorizontalAddrStart,   &[0x0000])?;
-        ili9325.command(Command::HorizontalAddrEnd,     &[0x00ef])?;
-        ili9325.command(Command::VerticalAddrStart,     &[0x0000])?;
-        ili9325.command(Command::VerticalAddrEnd,       &[0x013f])?;
-        ili9325.command(Command::DrvCtl2,               &[0xa700])?;
-        ili9325.command(Command::Bidc,                  &[0x0003])?;
-        ili9325.command(Command::Vsc,                   &[0x0000])?;
-        ili9325.command(Command::Reg80,                 &[0x0000])?;
-        ili9325.command(Command::Reg81,                 &[0x0000])?;
-        ili9325.command(Command::Reg82,                 &[0x0000])?;
-        ili9325.command(Command::Reg83,                 &[0x0000])?;
-        ili9325.command(Command::Reg84,                 &[0x0000])?;
-        ili9325.command(Command::Reg85,                 &[0x0000])?;
-        ili9325.command(Command::Reg90,                 &[0x0013])?;
-        ili9325.command(Command::Reg92,                 &[0x0000])?;
-        ili9325.command(Command::Reg93,                 &[0x0003])?;
-        ili9325.command(Command::Reg95,                 &[0x0110])?;
-        ili9325.command(Command::DispCtl1,              &[0x0173])?;
+        ili9325.command(Command::PwrCtl1, &[0x16b0])?;
+        ili9325.command(Command::PwrCtl2, &[0x0001])?;
+        ili9325.command(Command::Reg17, &[0x0001])?;
+        ili9325.command(Command::PwrCtl3, &[0x0138])?;
+        ili9325.command(Command::PwrCtl4, &[0x0800])?;
+        ili9325.command(Command::PwrCtl7, &[0x0009])?;
+        ili9325.command(Command::PwrCtl8, &[0x0009])?;
+        ili9325.command(Command::Rega4, &[0x0000])?;
+        ili9325.command(Command::HorizontalAddrStart, &[0x0000])?;
+        ili9325.command(Command::HorizontalAddrEnd, &[0x00ef])?;
+        ili9325.command(Command::VerticalAddrStart, &[0x0000])?;
+        ili9325.command(Command::VerticalAddrEnd, &[0x013f])?;
+        ili9325.command(Command::DrvCtl2, &[0xa700])?;
+        ili9325.command(Command::Bidc, &[0x0003])?;
+        ili9325.command(Command::Vsc, &[0x0000])?;
+        ili9325.command(Command::Reg80, &[0x0000])?;
+        ili9325.command(Command::Reg81, &[0x0000])?;
+        ili9325.command(Command::Reg82, &[0x0000])?;
+        ili9325.command(Command::Reg83, &[0x0000])?;
+        ili9325.command(Command::Reg84, &[0x0000])?;
+        ili9325.command(Command::Reg85, &[0x0000])?;
+        ili9325.command(Command::Reg90, &[0x0013])?;
+        ili9325.command(Command::Reg92, &[0x0000])?;
+        ili9325.command(Command::Reg93, &[0x0003])?;
+        ili9325.command(Command::Reg95, &[0x0110])?;
+        ili9325.command(Command::DispCtl1, &[0x0173])?;
         delay.delay_ms(50);
         ili9325.set_window(0, 0, 239, 319)?;
         Ok(ili9325)
     }
 
     pub fn clear(&mut self, color: Rgb565) -> Result {
-        for _ in 0..self.width*self.height {
+        for _ in 0..self.width * self.height {
             self.write_iter([color.into_storage()].iter().copied())?;
         }
         Ok(())
@@ -143,16 +143,17 @@ where
     }
 
     fn write_iter<I: IntoIterator<Item = u16>>(&mut self, data: I) -> Result {
-        self.interface.send_commands(U8Iter(&mut once(Command::WriteDataToGram as u8)))?;
+        self.interface
+            .send_commands(U8Iter(&mut once(Command::WriteDataToGram as u8)))?;
         self.interface.send_data(U16BEIter(&mut data.into_iter()))
     }
 
     fn set_window(&mut self, x0: u16, y0: u16, x1: u16, y1: u16) -> Result {
         self.command(Command::HorizontalAddrStart, &[x0])?;
-        self.command(Command::HorizontalAddrEnd, &[x1])?; 
+        self.command(Command::HorizontalAddrEnd, &[x1])?;
         self.command(Command::VerticalAddrStart, &[y0])?;
         self.command(Command::VerticalAddrEnd, &[y1])?;
-        self.command(Command::HorizontalGRAMAddrSet, &[x0])?; 
+        self.command(Command::HorizontalGRAMAddrSet, &[x0])?;
         self.command(Command::VerticalGRAMAddrSet, &[y0])
     }
 
@@ -189,7 +190,6 @@ where
     pub fn draw_raw_slice(&mut self, x0: u16, y0: u16, x1: u16, y1: u16, data: &[u16]) -> Result {
         self.draw_raw_iter(x0, y0, x1, y1, data.iter().copied())
     }
-
 }
 
 impl<IFACE> Ili9325<IFACE> {
@@ -221,23 +221,23 @@ enum Command {
     PwrCtl2 = 0x11,
     PwrCtl3 = 0x12,
     PwrCtl4 = 0x13,
-    Reg17   = 0x17,
+    Reg17 = 0x17,
     PwrCtl7 = 0x29,
     PwrCtl8 = 0x2a,
     DrvCtl2 = 0x60,
-    Bidc    = 0x61,
-    Vsc     = 0x6a,
-    Reg80   = 0x80,
-    Reg81   = 0x81,
-    Reg82   = 0x82,
-    Reg83   = 0x83,
-    Reg84   = 0x84,
-    Reg85   = 0x85,
-    Reg90   = 0x90,
-    Reg92   = 0x92,
-    Reg93   = 0x93,
-    Reg95   = 0x95,
-    Rega4   = 0xa4,
+    Bidc = 0x61,
+    Vsc = 0x6a,
+    Reg80 = 0x80,
+    Reg81 = 0x81,
+    Reg82 = 0x82,
+    Reg83 = 0x83,
+    Reg84 = 0x84,
+    Reg85 = 0x85,
+    Reg90 = 0x90,
+    Reg92 = 0x92,
+    Reg93 = 0x93,
+    Reg95 = 0x95,
+    Rega4 = 0xa4,
     HorizontalGRAMAddrSet = 0x20,
     VerticalGRAMAddrSet = 0x21,
     WriteDataToGram = 0x22,
