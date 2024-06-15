@@ -427,7 +427,7 @@ fn main() -> ! {
         dp.USART1,
         (tx_1, rx_1),
         Config::default()
-            .baudrate(115200.bps())
+            .baudrate(380400.bps())
             .parity_none()
             .stopbits(StopBits::STOP1)
             .dma(serial::config::DmaConfig::Rx),
@@ -724,6 +724,8 @@ fn usr_wifi232_t_init(tx: &mut dyn Write, delay: &mut dyn DelayMs<u16>) {
     //usr_wifi232_cmd(tx, delay, b"at+wsssid\r", 100, "+ok");
     //usr_wifi232_cmd(tx, delay, b"at+wskey=WPA2PSK,AES,xxxyyyzzz\r", 100, "+ok");
     //usr_wifi232_cmd(tx, delay, b"at+wskey\r", 100, "+ok");
+    usr_wifi232_cmd(tx, delay, b"at+uart=380400,8,1,None,NFC\r", 100, "+ok");
+    usr_wifi232_cmd(tx, delay, b"at+uart\r", 100, "+ok");
     usr_wifi232_cmd(tx, delay, b"at+wann\r", 100, "+ok");
     usr_wifi232_cmd(tx, delay, b"at+netp\r", 100, "+ok");
     usr_wifi232_cmd(
