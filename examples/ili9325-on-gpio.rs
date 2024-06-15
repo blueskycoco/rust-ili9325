@@ -720,17 +720,21 @@ fn usr_wifi232_t_init(tx: &mut dyn Write, delay: &mut dyn DelayMs<u16>) {
     //delay.delay_ms(3000_u16);
     //usr_wifi232_cmd(tx, delay, b"+++", 100, "a");
     //usr_wifi232_cmd(tx, delay, b"a", 100, "+ok");
+    //usr_wifi232_cmd(tx, delay, b"at+wsssid=8848\r", 100, "+ok");
+    //usr_wifi232_cmd(tx, delay, b"at+wsssid\r", 100, "+ok");
+    //usr_wifi232_cmd(tx, delay, b"at+wskey=WPA2PSK,AES,xxxyyyzzz\r", 100, "+ok");
+    //usr_wifi232_cmd(tx, delay, b"at+wskey\r", 100, "+ok");
     usr_wifi232_cmd(tx, delay, b"at+wann\r", 100, "+ok");
     usr_wifi232_cmd(tx, delay, b"at+netp\r", 100, "+ok");
     usr_wifi232_cmd(
         tx,
         delay,
-        b"at+netp=tcp,server,1234,192.168.1.2\r",
+        b"at+netp=tcp,server,1234,172.20.10.2\r",
         100,
         "+ok",
     );
     usr_wifi232_cmd(tx, delay, b"at+netp\r", 100, "+ok");
-    usr_wifi232_cmd(tx, delay, b"at+ping=192.168.1.6\r", 100, "Success");
+    usr_wifi232_cmd(tx, delay, b"at+ping=172.20.10.11\r", 100, "Success");
     usr_wifi232_cmd(tx, delay, b"at+h\r", 100, "+ok");
     usr_wifi232_cmd(tx, delay, b"at+tcpdis=on\r", 100, "+ok");
     usr_wifi232_cmd(tx, delay, b"at+tcpdis\r", 100, "+ok");
