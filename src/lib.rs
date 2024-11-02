@@ -1,7 +1,6 @@
 #![no_std]
 
-use embedded_hal::blocking::delay::DelayMs;
-
+use cortex_m::asm::delay;
 use core::iter::once;
 use display_interface::DataFormat::{U16BEIter, U8Iter, U16};
 use display_interface::WriteOnlyDataCommand;
@@ -66,13 +65,11 @@ impl<IFACE> Ili9325<IFACE>
 where
     IFACE: WriteOnlyDataCommand,
 {
-    pub fn new<DELAY, SIZE>(
+    pub fn new<SIZE>(
         interface: IFACE,
-        delay: &mut DELAY,
         _display_size: SIZE,
     ) -> Result<Self>
     where
-        DELAY: DelayMs<u16>,
         SIZE: DisplaySize,
     {
         let mut ili9325 = Ili9325 {
@@ -91,9 +88,9 @@ where
         ili9325.command(Command::RGBDispCtl1, &[0x0001])?;
         ili9325.command(Command::FrameMarker, &[0x0000])?;
         ili9325.command(Command::RGBDispCtl2, &[0x0000])?;
-        delay.delay_ms(50);
+        delay(50000);
         ili9325.command(Command::DispCtl1, &[0x0101])?;
-        delay.delay_ms(50);
+        delay(50000);
         ili9325.command(Command::PwrCtl1, &[0x16b0])?;
         ili9325.command(Command::PwrCtl2, &[0x0001])?;
         ili9325.command(Command::Reg17, &[0x0001])?;
@@ -120,7 +117,7 @@ where
         ili9325.command(Command::Reg93, &[0x0003])?;
         ili9325.command(Command::Reg95, &[0x0110])?;
         ili9325.command(Command::DispCtl1, &[0x0173])?;
-        delay.delay_ms(50);
+        delay(50000);
         ili9325.set_window(0, 0, 239, 319)?;
         Ok(ili9325)
     }
